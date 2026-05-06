@@ -1,7 +1,6 @@
 import areAllImageDimensionsEqual from './areAllImageDimensionsEqual';
 import areAllImageComponentsEqual from './areAllImageComponentsEqual';
 import areAllImagePositionsEqual from './areAllImagePositionsEqual';
-import areAllImageSpacingEqual from './areAllImageSpacingEqual';
 import { DisplaySetMessage, DisplaySetMessageList, utils } from '@ohif/core';
 
 const { areAllImageOrientationsEqual } = utils;
@@ -31,6 +30,5 @@ export default function checkSingleFrames(
     if (!areAllImagePositionsEqual(instances)) {
       messages.addMessage(DisplaySetMessage.CODES.INCONSISTENT_POSITION_INFORMATION);
     }
-    areAllImageSpacingEqual(instances, messages);
   }
 }

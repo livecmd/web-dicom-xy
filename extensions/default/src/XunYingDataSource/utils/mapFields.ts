@@ -13,11 +13,25 @@ const MODALITY_SOP_CLASS_MAP: Record<string, string> = {
 
 const DEFAULT_SOP_CLASS_UID = '1.2.840.10008.5.1.4.1.1.7';
 
-export function getSopClassUID(modality: string): string {
+export function normalizeModality(modality: string): string {
   if (!modality) {
+    return '';
+  }
+
+  const modalities = modality
+    .split(/[\\,/]/)
+    .map(item => item.trim().toUpperCase())
+    .filter(Boolean);
+
+  return modalities.find(item => MODALITY_SOP_CLASS_MAP[item]) || modality.toUpperCase();
+}
+
+export function getSopClassUID(modality: string): string {
+  const normalizedModality = normalizeModality(modality);
+  if (!normalizedModality) {
     return DEFAULT_SOP_CLASS_UID;
   }
-  return MODALITY_SOP_CLASS_MAP[modality.toUpperCase()] || DEFAULT_SOP_CLASS_UID;
+  return MODALITY_SOP_CLASS_MAP[normalizedModality] || DEFAULT_SOP_CLASS_UID;
 }
 
 function parseBackslashSeparated(value: string | undefined | null): number[] | undefined {
@@ -25,6 +39,32 @@ function parseBackslashSeparated(value: string | undefined | null): number[] | u
     return undefined;
   }
   return value.split('\\').map(Number);
+}
+
+function parseNumber(value: string | number | undefined | null): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const n = parseFloat(String(value).split('\\')[0]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function getImageOrientationPatient(imageData: XunYingImageData): number[] | undefined {
+  return parseBackslashSeparated(imageData.imageorientation) || [1, 0, 0, 0, 1, 0];
+}
+
+function getImagePositionPatient(imageData: XunYingImageData): number[] | undefined {
+  const imagePositionPatient = parseBackslashSeparated(imageData.imgpos);
+  if (imagePositionPatient?.length === 3) {
+    return imagePositionPatient;
+  }
+
+  const sliceLocation = parseNumber(imageData.sliceloction);
+  if (sliceLocation !== undefined) {
+    return [0, 0, sliceLocation];
+  }
+
+  return undefined;
 }
 
 function parseDateToDA(dateStr: string | undefined | null): string | undefined {
@@ -67,6 +107,13 @@ export interface XunYingImageData {
   slice_thick: string;
   studyid: string;
   study_desc: string;
+  imgpos?: string;
+  imageorientation?: string;
+  rescaleslope?: string | number;
+  rescaleintercept?: string | number;
+  winwidth?: string | number;
+  wincenter?: string | number;
+  image_type?: string;
 }
 
 export interface XunYingStudyData {
@@ -87,21 +134,25 @@ export function mapInstanceToNaturalized(
   imageIndex: number
 ) {
   const pixelSpacing = parseBackslashSeparated(imageData.pixelspacing);
-  const sopClassUID = getSopClassUID(modality);
-  const is16Bit = ['CT', 'MR', 'PT', 'NM'].includes(modality.toUpperCase());
+  const imageOrientationPatient = getImageOrientationPatient(imageData);
+  const imagePositionPatient = getImagePositionPatient(imageData);
+  const normalizedModality = normalizeModality(modality);
+  const sopClassUID = getSopClassUID(normalizedModality);
+  const is16Bit = ['CT', 'MR', 'PT', 'NM'].includes(normalizedModality);
 
   return {
     StudyInstanceUID: studyUID,
     SeriesInstanceUID: seriesUID,
     SOPInstanceUID: imageData.imageuid,
     SOPClassUID: sopClassUID,
-    Modality: modality,
+    Modality: normalizedModality || modality,
     Rows: imageData.rows,
     Columns: imageData.columns,
     NumberOfFrames: imageData.numberofframes || 1,
     InstanceNumber: imageData.imageno || imageIndex + 1,
     SeriesNumber: parseInt(imageData.series_no || imageData.seriesno) || 1,
     SeriesDescription: imageData.series_desc || '',
+    ImageType: imageData.image_type,
     StudyDescription: imageData.study_desc || studyData?.name || '',
     StudyDate: parseDateToDA(imageData.series_date || studyData?.studytime),
     StudyTime: parseTimeToTM(studyData?.studytime),
@@ -117,14 +168,18 @@ export function mapInstanceToNaturalized(
     SliceThickness: imageData.slice_thick ? parseFloat(imageData.slice_thick) : undefined,
     SliceLocation: imageData.sliceloction ? parseFloat(imageData.sliceloction) : undefined,
     PixelSpacing: pixelSpacing,
+    ImageOrientationPatient: imageOrientationPatient,
+    ImagePositionPatient: imagePositionPatient,
     BitsAllocated: is16Bit ? 16 : 8,
     BitsStored: is16Bit ? 16 : 8,
     HighBit: is16Bit ? 15 : 7,
     PixelRepresentation: is16Bit ? 1 : 0,
     SamplesPerPixel: 1,
     PhotometricInterpretation: 'MONOCHROME2',
-    RescaleSlope: 1,
-    RescaleIntercept: 0,
-    FrameOfReferenceUID: seriesUID + '.0',
+    RescaleSlope: parseNumber(imageData.rescaleslope) ?? 1,
+    RescaleIntercept: parseNumber(imageData.rescaleintercept) ?? 0,
+    WindowWidth: parseNumber(imageData.winwidth),
+    WindowCenter: parseNumber(imageData.wincenter),
+    FrameOfReferenceUID: studyUID,
   };
 }

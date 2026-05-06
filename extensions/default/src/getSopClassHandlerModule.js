@@ -34,6 +34,27 @@ const isMultiFrame = instance => {
   return instance.NumberOfFrames > 1;
 };
 
+const isXunYingReconstructableStack = instances => {
+  if (!instances?.length || instances.length < 2) {
+    return false;
+  }
+
+  const firstInstance = instances[0];
+  if (!firstInstance?.imageId?.startsWith?.('xunying:') || !firstInstance.Modality?.includes('CT')) {
+    return false;
+  }
+
+  return instances.every(instance => {
+    return (
+      instance.Rows === firstInstance.Rows &&
+      instance.Columns === firstInstance.Columns &&
+      instance.SamplesPerPixel === firstInstance.SamplesPerPixel &&
+      instance.ImagePositionPatient?.length === 3 &&
+      instance.ImageOrientationPatient?.length === 6
+    );
+  });
+};
+
 function getDisplaySetInfo(instances) {
   const dynamicVolumeInfo = getDynamicVolumeInfo(instances);
   const { isDynamicVolume, timePoints } = dynamicVolumeInfo;
@@ -66,6 +87,13 @@ function getDisplaySetInfo(instances) {
     displaySetInfo = isDisplaySetReconstructable(firstTimePointInstances, appConfig);
   } else {
     displaySetInfo = isDisplaySetReconstructable(instances, appConfig);
+  }
+
+  if (!displaySetInfo.value && isXunYingReconstructableStack(instances)) {
+    displaySetInfo = {
+      ...displaySetInfo,
+      value: true,
+    };
   }
 
   return {

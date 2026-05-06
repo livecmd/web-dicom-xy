@@ -1,12 +1,8 @@
 import { DicomMetadataStore, IWebApiDataSource, utils, classes } from '@ohif/core';
-import {
-  fetchJson,
-  buildJsonUrl,
-  buildThumbnailUrl,
-  XunYingHttpConfig,
-} from './utils/httpClient';
+import { fetchJson, buildJsonUrl, buildThumbnailUrl, XunYingHttpConfig } from './utils/httpClient';
 import {
   mapInstanceToNaturalized,
+  normalizeModality,
   XunYingImageData,
   XunYingStudyData,
 } from './utils/mapFields';
@@ -112,10 +108,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
 
   const implementation = {
     initialize: ({ params, query }) => {
-      if (
-        xunyingConfig.onConfiguration &&
-        typeof xunyingConfig.onConfiguration === 'function'
-      ) {
+      if (xunyingConfig.onConfiguration && typeof xunyingConfig.onConfiguration === 'function') {
         xunyingConfig = xunyingConfig.onConfiguration(xunyingConfig, { params, query });
       }
 
@@ -139,7 +132,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
 
     query: {
       studies: {
-        mapParams: (params) => params,
+        mapParams: params => params,
         search: async function (origParams) {
           const studyUID = pickFirstDefined(
             origParams?.studyInstanceUid,
@@ -161,7 +154,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
 
           return [mapStudySummary(studyUID, studyData)];
         },
-        processResults: (results) => results,
+        processResults: results => results,
       },
       series: {
         search: async function (studyInstanceUid) {
@@ -173,7 +166,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
             StudyInstanceUID: studyInstanceUid,
             SeriesInstanceUID: seriesUID,
             SeriesNumber: idx + 1,
-            Modality: studyData.modalities || '',
+            Modality: normalizeModality(studyData.modalities) || studyData.modalities || '',
           }));
         },
       },
@@ -185,7 +178,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     },
 
     retrieve: {
-      directURL: (params) => {
+      directURL: params => {
         return undefined;
       },
       bulkDataURI: async () => undefined,
@@ -234,7 +227,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
       },
     },
 
-    deleteStudyMetadataPromise: (StudyInstanceUID) => {
+    deleteStudyMetadataPromise: StudyInstanceUID => {
       studyMetadataPromises.delete(StudyInstanceUID);
       for (const key of studyDataPromises.keys()) {
         if (key.endsWith(`|${StudyInstanceUID}`)) {
@@ -249,13 +242,11 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
       if (!images) {
         return imageIds;
       }
-      displaySet.images.forEach((instance) => {
+      displaySet.images.forEach(instance => {
         const numberOfFrames = instance.NumberOfFrames || 1;
         if (numberOfFrames > 1) {
           for (let frame = 1; frame <= numberOfFrames; frame++) {
-            imageIds.push(
-              this.getImageIdsForInstance({ instance, frame })
-            );
+            imageIds.push(this.getImageIdsForInstance({ instance, frame }));
           }
         } else {
           imageIds.push(this.getImageIdsForInstance({ instance }));
@@ -363,7 +354,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     }
 
     const firstImage = images[0];
-    const seriesModality = studyData.modalities || 'OT';
+    const seriesModality = normalizeModality(studyData.modalities) || 'OT';
     const seriesNumber = parseInt(firstImage.series_no || firstImage.seriesno) || 1;
 
     const seriesMeta = {

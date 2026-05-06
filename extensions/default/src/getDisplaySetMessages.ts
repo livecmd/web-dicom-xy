@@ -26,8 +26,9 @@ export default function getDisplaySetMessages(
 
   const firstInstance = instances[0];
   const { Modality, ImageType, NumberOfFrames } = firstInstance;
-  // Due to current requirements, LOCALIZER series doesn't have any messages
-  if (ImageType?.includes('LOCALIZER')) {
+  const imageType = ImageType?.toUpperCase?.() || '';
+  // Due to current requirements, LOCALIZER and SCREEN SAVE series don't have any messages.
+  if (imageType.includes('LOCALIZER') || imageType.includes('SCREEN SAVE')) {
     return messages;
   }
 
