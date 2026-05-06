@@ -1,6 +1,7 @@
 window.config = {
   routerBasename: '/',
-  showStudyList: true,
+  showStudyList: false,
+  initialModeRoute: '/viewer',
   maxNumberOfWebWorkers: 3,
   showWarningMessageForCrossOrigin: false,
   showCPUFallbackMessage: false,
@@ -19,7 +20,7 @@ window.config = {
       configuration: {
         friendlyName: '迅影 DICOM 服务器',
         name: 'xunying',
-        baseUrl: '/webpacs/api',
+        baseUrl: 'https://xunyingmed.cn/webpacs/api',
         hospital: '',
         token: '',
       },

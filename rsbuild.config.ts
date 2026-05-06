@@ -10,7 +10,11 @@ const DIST_DIR = path.resolve(__dirname, './platform/app/dist');
 const PUBLIC_DIR = path.resolve(__dirname, './platform/app/public');
 
 // Environment variables (similar to webpack.pwa.js)
-const APP_CONFIG = process.env.APP_CONFIG || 'config/default.js';
+const APP_CONFIG =
+  process.env.APP_CONFIG ||
+  (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV
+    ? 'config/xunying.js'
+    : 'config/default.js');
 const PUBLIC_URL = process.env.PUBLIC_URL || '/';
 
 // Add these constants

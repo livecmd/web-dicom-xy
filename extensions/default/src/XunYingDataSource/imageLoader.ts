@@ -14,6 +14,8 @@ interface ParsedImageId {
   seriesUID: string;
   sopInstanceUID: string;
   frameNumber?: number;
+  rows?: number;
+  columns?: number;
 }
 
 export function parseXunYingImageId(imageId: string): ParsedImageId {
@@ -29,17 +31,30 @@ export function parseXunYingImageId(imageId: string): ParsedImageId {
   if (framesIndex > 0 && parts[framesIndex + 1]) {
     frameNumber = parseInt(parts[framesIndex + 1], 10);
   }
-  return { studyUID, seriesUID, sopInstanceUID, frameNumber };
+  const sizeIndex = parts.indexOf('size');
+  const rows = sizeIndex > 0 && parts[sizeIndex + 1] ? parseInt(parts[sizeIndex + 1], 10) : undefined;
+  const columns =
+    sizeIndex > 0 && parts[sizeIndex + 2] ? parseInt(parts[sizeIndex + 2], 10) : undefined;
+
+  return { studyUID, seriesUID, sopInstanceUID, frameNumber, rows, columns };
 }
 
 export function buildXunYingImageId(
   studyUID: string,
   seriesUID: string,
   sopInstanceUID: string,
-  frameNumber?: number
+  frameNumber?: number,
+  rows?: number,
+  columns?: number
 ): string {
-  const base = `${XUNYING_SCHEME}:${studyUID}/${seriesUID}/${sopInstanceUID}`;
-  return frameNumber !== undefined ? `${base}/frames/${frameNumber}` : base;
+  let imageId = `${XUNYING_SCHEME}:${studyUID}/${seriesUID}/${sopInstanceUID}`;
+  if (frameNumber !== undefined) {
+    imageId += `/frames/${frameNumber}`;
+  }
+  if (rows && columns) {
+    imageId += `/size/${rows}/${columns}`;
+  }
+  return imageId;
 }
 
 function buildPixelArray(arrayBuffer: ArrayBuffer, bitType: 1 | 2 | 3) {
@@ -64,6 +79,27 @@ function calcMinMax(pixelData: Int16Array | Uint8Array): { min: number; max: num
   return { min, max };
 }
 
+function getFirstNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const first = String(value).split('\\')[0];
+  const n = parseFloat(first);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function getSpacing(value: unknown, index: number): number {
+  if (!value) {
+    return 1;
+  }
+
+  const spacing = String(value)
+    .split('\\')
+    .map(item => parseFloat(item));
+  return Number.isFinite(spacing[index]) ? spacing[index] : 1;
+}
+
 function xunyingImageLoader(imageId: string) {
   if (!loaderConfig) {
     return {
@@ -75,32 +111,44 @@ function xunyingImageLoader(imageId: string) {
     };
   }
 
-  const { studyUID, seriesUID, sopInstanceUID, frameNumber } = parseXunYingImageId(imageId);
+  const { studyUID, seriesUID, sopInstanceUID, frameNumber, rows, columns } =
+    parseXunYingImageId(imageId);
 
   const promise = fetchPixelData(
     loaderConfig,
     studyUID,
     seriesUID,
     sopInstanceUID,
-    frameNumber
+    frameNumber,
+    rows,
+    columns
   ).then(pixel => {
     const pixelData = buildPixelArray(pixel.arrayBuffer, pixel.bitType);
     const { min, max } = calcMinMax(pixelData);
 
     const isColor = pixel.bitType === 3;
     const is16Bit = pixel.bitType === 2;
+    const imageInfo = pixel.imageInfo || {};
 
     const windowCenter =
-      pixel.defaultCenter ?? parseFloat(pixel.imageInfo?.wincenter?.split('\\')[0] || '') ?? 0;
+      getFirstNumber(imageInfo.wincenter) ??
+      getFirstNumber(imageInfo.WinCenter) ??
+      pixel.defaultCenter ??
+      0;
     const windowWidth =
-      pixel.defaultWindow ?? parseFloat(pixel.imageInfo?.winwidth?.split('\\')[0] || '') ?? 400;
+      getFirstNumber(imageInfo.winwidth) ??
+      getFirstNumber(imageInfo.WinWidth) ??
+      pixel.defaultWindow ??
+      400;
+    const slope = getFirstNumber(imageInfo.rescaleslope) ?? 1;
+    const intercept = getFirstNumber(imageInfo.rescaleintercept) ?? 0;
 
     const image: any = {
       imageId,
       minPixelValue: min,
       maxPixelValue: max,
-      slope: 1,
-      intercept: 0,
+      slope,
+      intercept,
       windowCenter: Number.isFinite(windowCenter) ? windowCenter : 0,
       windowWidth: Number.isFinite(windowWidth) ? windowWidth : 400,
       getPixelData: () => pixelData,
@@ -111,8 +159,8 @@ function xunyingImageLoader(imageId: string) {
       color: isColor,
       rgba: false,
       numberOfComponents: isColor ? 3 : 1,
-      columnPixelSpacing: parseFloat(pixel.imageInfo?.pixelspacing?.split('\\')[1] || '1') || 1,
-      rowPixelSpacing: parseFloat(pixel.imageInfo?.pixelspacing?.split('\\')[0] || '1') || 1,
+      columnPixelSpacing: getSpacing(imageInfo.pixelspacing, 1),
+      rowPixelSpacing: getSpacing(imageInfo.pixelspacing, 0),
       invert: pixel.inverse,
       sizeInBytes: pixel.arrayBuffer.byteLength,
       photometricInterpretation: isColor ? 'RGB' : 'MONOCHROME2',
@@ -122,6 +170,18 @@ function xunyingImageLoader(imageId: string) {
       pixelRepresentation: is16Bit ? 1 : 0,
       samplesPerPixel: isColor ? 3 : 1,
       FrameOfReferenceUID: `${seriesUID}.0`,
+      imagePositionPatient: imageInfo.imgpos,
+      imageOrientationPatient: imageInfo.imageorientation,
+      sliceLocation: getFirstNumber(imageInfo.sliceloction),
+      sliceThickness: getFirstNumber(imageInfo.slicethick),
+      modality: imageInfo.modality,
+      patientId: imageInfo.patientid,
+      patientName: imageInfo.name,
+      patientSex: imageInfo.sex,
+      patientAge: imageInfo.age,
+      studyDescription: imageInfo.studydesc,
+      seriesDescription: imageInfo.seriesdesc,
+      rescaleType: imageInfo.rescale_type,
     };
 
     return image;

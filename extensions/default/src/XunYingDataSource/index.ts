@@ -26,23 +26,75 @@ export interface XunYingDataSourceConfig {
   onConfiguration?: (config: XunYingDataSourceConfig, params: any) => XunYingDataSourceConfig;
 }
 
+function pickFirstDefined<T>(...values: T[]): T | undefined {
+  return values.find(value => value !== undefined && value !== null && value !== '') as
+    | T
+    | undefined;
+}
+
+function splitStudyInstanceUIDs(value: string | string[] | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(item => utils.splitComma([item]));
+  }
+
+  return utils.splitComma([value]);
+}
+
+function mapStudySummary(studyUID: string, studyData: XunYingStudyData) {
+  const [date = '', time = ''] = (studyData.studytime || '').split(' ');
+
+  return {
+    studyInstanceUid: studyUID,
+    studyInstanceUID: studyUID,
+    patientName: studyData.name || '',
+    modalities: studyData.modalities || '',
+    description: '',
+    accession: '',
+    mrn: '',
+    instances: 0,
+    date: date.replace(/-/g, ''),
+    time: time.replace(/:/g, ''),
+  };
+}
+
 function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManager) {
   let configCopy: XunYingDataSourceConfig;
   let httpConfig: XunYingHttpConfig;
 
+  const studyDataPromises = new Map<string, Promise<XunYingStudyData>>();
   const studyMetadataPromises = new Map<string, Promise<any>>();
 
   function getHttpConfig(): XunYingHttpConfig {
     return httpConfig;
   }
 
+  function getStudyDataCacheKey(studyUID: string) {
+    const cfg = getHttpConfig();
+    return `${cfg.baseUrl}|${cfg.hospital}|${cfg.token}|${studyUID}`;
+  }
+
   async function fetchStudyData(studyUID: string): Promise<XunYingStudyData> {
+    const cacheKey = getStudyDataCacheKey(studyUID);
+    const existingPromise = studyDataPromises.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
     const url = buildJsonUrl(getHttpConfig(), '/study', {
       level: 'study',
       studyuid: studyUID,
       ai: 1,
     });
-    return fetchJson<XunYingStudyData>(getHttpConfig(), url);
+    const promise = fetchJson<XunYingStudyData>(getHttpConfig(), url).catch(error => {
+      studyDataPromises.delete(cacheKey);
+      throw error;
+    });
+    studyDataPromises.set(cacheKey, promise);
+    return promise;
   }
 
   async function fetchSeriesImages(
@@ -89,7 +141,25 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
       studies: {
         mapParams: (params) => params,
         search: async function (origParams) {
-          return [];
+          const studyUID = pickFirstDefined(
+            origParams?.studyInstanceUid,
+            origParams?.StudyInstanceUID,
+            origParams?.studyuid,
+            origParams?.studyUID,
+            splitStudyInstanceUIDs(origParams?.StudyInstanceUIDs)?.[0],
+            splitStudyInstanceUIDs(origParams?.studyInstanceUIDs)?.[0]
+          );
+
+          if (!studyUID) {
+            return [];
+          }
+
+          const studyData = await fetchStudyData(studyUID);
+          if (!studyData?.series?.length) {
+            return [];
+          }
+
+          return [mapStudySummary(studyUID, studyData)];
         },
         processResults: (results) => results,
       },
@@ -166,6 +236,11 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
 
     deleteStudyMetadataPromise: (StudyInstanceUID) => {
       studyMetadataPromises.delete(StudyInstanceUID);
+      for (const key of studyDataPromises.keys()) {
+        if (key.endsWith(`|${StudyInstanceUID}`)) {
+          studyDataPromises.delete(key);
+        }
+      }
     },
 
     getImageIdsForDisplaySet(displaySet) {
@@ -190,8 +265,15 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     },
 
     getImageIdsForInstance({ instance, frame = undefined }) {
-      const { StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID } = instance;
-      return buildXunYingImageId(StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID, frame);
+      const { StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID, Rows, Columns } = instance;
+      return buildXunYingImageId(
+        StudyInstanceUID,
+        SeriesInstanceUID,
+        SOPInstanceUID,
+        frame,
+        Rows,
+        Columns
+      );
     },
 
     getConfig() {
@@ -199,19 +281,30 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     },
 
     getStudyInstanceUIDs({ params, query }) {
-      const paramsStudyInstanceUIDs =
-        params.StudyInstanceUIDs || params.studyInstanceUIDs;
+      const paramsStudyInstanceUIDs = pickFirstDefined(
+        params.StudyInstanceUIDs,
+        params.studyInstanceUIDs,
+        params.StudyInstanceUID,
+        params.studyInstanceUID,
+        params.studyuid,
+        params.studyUID
+      );
 
       const queryStudyInstanceUIDs = utils.splitComma(
-        query.getAll('StudyInstanceUIDs').concat(query.getAll('studyInstanceUIDs'))
+        query
+          .getAll('StudyInstanceUIDs')
+          .concat(query.getAll('studyInstanceUIDs'))
+          .concat(query.getAll('StudyInstanceUID'))
+          .concat(query.getAll('studyInstanceUID'))
+          .concat(query.getAll('studyuid'))
+          .concat(query.getAll('studyUID'))
       );
 
       const StudyInstanceUIDs =
-        (queryStudyInstanceUIDs.length && queryStudyInstanceUIDs) || paramsStudyInstanceUIDs;
+        (queryStudyInstanceUIDs.length && queryStudyInstanceUIDs) ||
+        splitStudyInstanceUIDs(paramsStudyInstanceUIDs);
 
-      return StudyInstanceUIDs && Array.isArray(StudyInstanceUIDs)
-        ? StudyInstanceUIDs
-        : [StudyInstanceUIDs];
+      return StudyInstanceUIDs.filter(Boolean);
     },
   };
 
@@ -225,90 +318,119 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
       return [];
     }
 
-    const modality = studyData.modalities || '';
-    const seriesSummaryMetadata: any[] = [];
-    const allSeriesPromises: Promise<void>[] = [];
-
-    for (const seriesUID of studyData.series) {
-      const seriesPromise = fetchSeriesImages(StudyInstanceUID, seriesUID).then(
-        (images) => {
-          if (!images || images.length === 0) {
-            return;
-          }
-
-          const firstImage = images[0];
-          const seriesModality = modality || 'OT';
-          const seriesNumber =
-            parseInt(firstImage.series_no || firstImage.seriesno) || 1;
-
-          const seriesMeta = {
-            StudyInstanceUID,
-            SeriesInstanceUID: seriesUID,
-            SeriesDescription: firstImage.series_desc || '',
-            SeriesNumber: seriesNumber,
-            Modality: seriesModality,
-            StudyDescription: firstImage.study_desc || studyData.name || '',
-            SOPClassUID: undefined as string | undefined,
-          };
-
-          const naturalizedInstances = images.map((imageData, idx) => {
-            const naturalized = mapInstanceToNaturalized(
-              imageData,
+    const seriesLoaders = studyData.series.map((seriesUID, index) => {
+      let startPromise: Promise<any> | undefined;
+      const loader: any = {
+        StudyInstanceUID,
+        SeriesInstanceUID: seriesUID,
+        SeriesNumber: index + 1,
+        Modality: studyData.modalities || 'OT',
+        start: () => {
+          if (!startPromise) {
+            startPromise = _retrieveSeriesMetadata(
               StudyInstanceUID,
               seriesUID,
-              seriesModality,
               studyData,
-              idx
-            );
+              madeInClient
+            ).catch(error => {
+              startPromise = undefined;
+              throw error;
+            });
+          }
+          return startPromise;
+        },
+      };
+      return loader;
+    });
 
-            if (!seriesMeta.SOPClassUID) {
-              seriesMeta.SOPClassUID = naturalized.SOPClassUID;
-            }
-
-            const numberOfFrames = naturalized.NumberOfFrames || 1;
-            for (let i = 0; i < numberOfFrames; i++) {
-              const frameNumber = i + 1;
-              const frameImageId = buildXunYingImageId(
-                StudyInstanceUID,
-                seriesUID,
-                naturalized.SOPInstanceUID,
-                numberOfFrames > 1 ? frameNumber : undefined
-              );
-              metadataProvider.addImageIdToUIDs(frameImageId, {
-                StudyInstanceUID,
-                SeriesInstanceUID: seriesUID,
-                SOPInstanceUID: naturalized.SOPInstanceUID,
-                frameNumber: numberOfFrames > 1 ? frameNumber : undefined,
-              });
-            }
-
-            const imageId = buildXunYingImageId(
-              StudyInstanceUID,
-              seriesUID,
-              naturalized.SOPInstanceUID
-            );
-            (naturalized as any).imageId = imageId;
-
-            return naturalized;
-          });
-
-          seriesSummaryMetadata.push(seriesMeta);
-          DicomMetadataStore.addInstances(naturalizedInstances, madeInClient);
-        }
-      );
-      allSeriesPromises.push(seriesPromise);
+    if (returnPromises) {
+      return seriesLoaders;
     }
 
-    DicomMetadataStore.addSeriesMetadata(seriesSummaryMetadata, madeInClient);
+    const seriesSummaryMetadata = await Promise.all(seriesLoaders.map(loader => loader.start()));
+    return seriesSummaryMetadata.filter(Boolean);
+  }
 
-    await Promise.all(allSeriesPromises);
+  async function _retrieveSeriesMetadata(
+    StudyInstanceUID: string,
+    seriesUID: string,
+    studyData: XunYingStudyData,
+    madeInClient: boolean
+  ) {
+    const images = await fetchSeriesImages(StudyInstanceUID, seriesUID);
+    if (!images || images.length === 0) {
+      return;
+    }
+
+    const firstImage = images[0];
+    const seriesModality = studyData.modalities || 'OT';
+    const seriesNumber = parseInt(firstImage.series_no || firstImage.seriesno) || 1;
+
+    const seriesMeta = {
+      StudyInstanceUID,
+      SeriesInstanceUID: seriesUID,
+      SeriesDescription: firstImage.series_desc || '',
+      SeriesNumber: seriesNumber,
+      Modality: seriesModality,
+      StudyDescription: firstImage.study_desc || studyData.name || '',
+      SOPClassUID: undefined as string | undefined,
+    };
+
+    const naturalizedInstances = images.map((imageData, idx) => {
+      const naturalized = mapInstanceToNaturalized(
+        imageData,
+        StudyInstanceUID,
+        seriesUID,
+        seriesModality,
+        studyData,
+        idx
+      );
+
+      if (!seriesMeta.SOPClassUID) {
+        seriesMeta.SOPClassUID = naturalized.SOPClassUID;
+      }
+
+      const numberOfFrames = naturalized.NumberOfFrames || 1;
+      for (let i = 0; i < numberOfFrames; i++) {
+        const frameNumber = i + 1;
+        const frameImageId = buildXunYingImageId(
+          StudyInstanceUID,
+          seriesUID,
+          naturalized.SOPInstanceUID,
+          numberOfFrames > 1 ? frameNumber : undefined,
+          naturalized.Rows,
+          naturalized.Columns
+        );
+        metadataProvider.addImageIdToUIDs(frameImageId, {
+          StudyInstanceUID,
+          SeriesInstanceUID: seriesUID,
+          SOPInstanceUID: naturalized.SOPInstanceUID,
+          frameNumber: numberOfFrames > 1 ? frameNumber : undefined,
+        });
+      }
+
+      const imageId = buildXunYingImageId(
+        StudyInstanceUID,
+        seriesUID,
+        naturalized.SOPInstanceUID,
+        undefined,
+        naturalized.Rows,
+        naturalized.Columns
+      );
+      (naturalized as any).imageId = imageId;
+
+      return naturalized;
+    });
+
+    DicomMetadataStore.addSeriesMetadata([seriesMeta], madeInClient);
+    DicomMetadataStore.addInstances(naturalizedInstances, madeInClient);
 
     const study = DicomMetadataStore.getStudy(StudyInstanceUID);
     if (study) {
       study.isLoaded = true;
     }
 
-    return seriesSummaryMetadata;
+    return seriesMeta;
   }
 
   return IWebApiDataSource.create(implementation);

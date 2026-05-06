@@ -63,7 +63,7 @@ export interface XunYingPixelResponse {
   imageLaterality?: string;
   viewPosition?: string;
   imageType?: string;
-  imageInfo: Record<string, string> | null;
+  imageInfo: Record<string, any> | null;
   bitType: 1 | 2 | 3;
 }
 
@@ -76,12 +76,23 @@ function parseHeaderNumber(value: string | null): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function parseInfoNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const first = String(value).split('\\')[0];
+  const n = parseFloat(first);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export async function fetchPixelData(
   config: XunYingHttpConfig,
   studyUID: string,
   seriesUID: string,
   sopInstanceUID: string,
-  frameNumber?: number
+  frameNumber?: number,
+  rows?: number,
+  columns?: number
 ): Promise<XunYingPixelResponse> {
   const url = buildPixelUrl(config, {
     requestType: 'gsps',
@@ -89,6 +100,8 @@ export async function fetchPixelData(
     seriesUID,
     objectUID: sopInstanceUID,
     frameNumber,
+    rows,
+    columns,
   });
 
   const response = await fetch(url, { method: 'GET' });
@@ -100,8 +113,25 @@ export async function fetchPixelData(
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  const width = parseInt(response.headers.get('width') || '0', 10);
-  const height = parseInt(response.headers.get('height') || '0', 10);
+
+  let imageInfo: Record<string, any> | null = null;
+  const imageInfoHeader = response.headers.get('imageinfo') || response.headers.get('Imageinfo');
+  if (imageInfoHeader) {
+    try {
+      imageInfo = JSON.parse(imageInfoHeader);
+    } catch {
+      imageInfo = null;
+    }
+  }
+
+  const width = parseInt(
+    response.headers.get('width') || String(columns || imageInfo?.columns || 0),
+    10
+  );
+  const height = parseInt(
+    response.headers.get('height') || String(rows || imageInfo?.rows || 0),
+    10
+  );
   if (!width || !height) {
     throw new Error(`XunYing 响应缺少 width/height 头: ${sopInstanceUID}`);
   }
@@ -120,28 +150,24 @@ export async function fetchPixelData(
     );
   }
 
-  let imageInfo: Record<string, string> | null = null;
-  const imageInfoHeader = response.headers.get('imageinfo');
-  if (imageInfoHeader) {
-    try {
-      imageInfo = JSON.parse(imageInfoHeader);
-    } catch {
-      imageInfo = null;
-    }
-  }
-
   return {
     arrayBuffer,
     width,
     height,
     frameNo: parseInt(response.headers.get('Frameno') || '1', 10),
     inverse: response.headers.get('inverse') === '1',
-    defaultCenter: parseHeaderNumber(response.headers.get('default_center')),
-    defaultWindow: parseHeaderNumber(response.headers.get('default_window')),
-    patientOrientation: response.headers.get('Patient_orientation') || undefined,
-    imageLaterality: response.headers.get('Image_laterality') || undefined,
-    viewPosition: response.headers.get('View_position') || undefined,
-    imageType: response.headers.get('Image_type') || undefined,
+    defaultCenter:
+      parseInfoNumber(imageInfo?.wincenter) ??
+      parseHeaderNumber(response.headers.get('default_center')),
+    defaultWindow:
+      parseInfoNumber(imageInfo?.winwidth) ??
+      parseHeaderNumber(response.headers.get('default_window')),
+    patientOrientation:
+      response.headers.get('Patient_orientation') || imageInfo?.patient_orientation || undefined,
+    imageLaterality:
+      response.headers.get('Image_laterality') || imageInfo?.image_laterality || undefined,
+    viewPosition: response.headers.get('View_position') || imageInfo?.view_position || undefined,
+    imageType: response.headers.get('Image_type') || imageInfo?.image_type || undefined,
     imageInfo,
     bitType,
   };

@@ -274,34 +274,9 @@ GET /webpacs/api/wado
 | `Text_annotations`     | string | JSON 字符串，包含文字标注数组（见下方结构）             |
 | `imageinfo`            | string | JSON 字符串，包含完整 DICOM 元数据（见下方结构）        |
 
-**`imageinfo` 响应头 JSON 字段详解：**
+**`imageinfo` 响应头 JSON 字段：**
 
-| 字段名              | 类型   | 说明                                              |
-|--------------------|--------|---------------------------------------------------|
-| `modality`         | string | 影像模态（CT / MR / CR / DX / MG / XA 等）        |
-| `Modality`         | string | 同 `modality`（兼容字段，代码中赋值 `info.Modality = info.modality`）|
-| `winwidth`         | string | DICOM 标签建议窗宽                                |
-| `WinWidth`         | string | 同 `winwidth`（兼容字段）                         |
-| `wincenter`        | string | DICOM 标签建议窗位                                |
-| `WinCenter`        | string | 同 `wincenter`（兼容字段）                        |
-| `name`             | string | 患者姓名（Patient Name）                          |
-| `patientid`        | string | 患者 ID（Patient ID）                             |
-| `sex`              | string | 患者性别                                          |
-| `age`              | string | 患者年龄                                          |
-| `seriesdesc`       | string | 序列描述（Series Description）                    |
-| `seriestime`       | string | 序列时间                                          |
-| `seriesno`         | string | 序列号                                            |
-| `studydesc`        | string | 检查描述（Study Description）                     |
-| `studyno`          | string | 检查号（Study ID）                                |
-| `slicethick`       | string | 切片厚度（Slice Thickness，单位 mm）              |
-| `sliceloction`     | string | 切片位置（Slice Location，单位 mm）               |
-| `pixelspacing`     | string | 像素间距（格式：`行间距\\列间距`，单位 mm）        |
-| `imgpos`           | string | 图像位置（Image Position Patient，格式：`x\\y\\z`）|
-| `imageorientation` | string | 图像方向余弦（Image Orientation Patient，格式：`r0\\r1\\r2\\c0\\c1\\c2`）|
-| `manufact`         | string | 设备制造商（Manufacturer）                        |
-| `manufactmodel`    | string | 设备型号（Manufacturer's Model Name）             |
-| `institution`      | string | 机构名称（Institution Name）                      |
-| `rescale_type`     | string | 像素值单位（如 `"HU"` 表示 Hounsfield Unit，用于 CT）|
+{"studyid": 1205199, "studyuid": "1.2.840.113619.2.417.3.2831214592.758.1776910662.585", "studytime": "2026-05-06 10:45:31", "studydesc": "ji suan ji ti ceng cheng xiang (CT) ping sao", "accessionno": "35655", "patientid": "35655", "studyno": "23511", "name": "Li Ling", "sex": "F", "age": "043Y", "birthday": "1982-10-21 00:00:00", "hospcode": "shapyy", "seriesid": 3297432, "seriesuid": "1.2.840.113619.2.417.3.2831214592.758.1776910662.590.3", "modality": "CT", "seriesno": 3, "seriestime": "2026-05-06 10:46:12", "seriesdesc": "Stnd", "bodypart": "CHEST", "manufact": "GE MEDICAL SYSTEMS", "institution": "Shanghaianpingyiyuang", "institutionaddr": "Shanghaishipudongxingqu", "manufactmodel": "Revolution ACTs", "imageid": 143715077, "imageno": 51, "imageuid": "1.2.840.113619.2.417.3.2831214592.758.1776910662.647.51", "rows": 512, "columns": 512, "winwidth": "350", "wincenter": "40", "imageorientation": "1.000000\\0.000000\\0.000000\\0.000000\\1.000000\\0.000000", "rescaleslope": 1.0, "rescaleintercept": -1024.0, "sliceloction": -81.0, "pixelspacing": "0.703125\\0.703125", "imgpos": "-180.000\\-180.000\\-81.805", "slicethick": 5.0, "numberofframes": 1, "haspixel": 1, "view_position": null, "image_laterality": null, "patient_orientation": null, "imager_pixel_spacing": null, "image_type": "ORIGINAL\\PRIMARY\\AXIAL", "rescale_type": "HU"}
 
 > **多值字段说明：** `winwidth` / `wincenter` 可能含多个值，以 `\\` 分隔，客户端取第一个值。
 

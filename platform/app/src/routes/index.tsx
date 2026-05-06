@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '@ohif/ui-next';
 
 // Route Components
@@ -65,6 +65,29 @@ NotFoundStudy.propTypes = {
   message: PropTypes.string,
 };
 
+const StartupRedirect = ({ route }) => {
+  const location = useLocation();
+  const targetPath = route?.props?.targetPath || '/viewer';
+
+  return (
+    <Navigate
+      replace
+      to={{
+        pathname: targetPath,
+        search: location.search,
+      }}
+    />
+  );
+};
+
+StartupRedirect.propTypes = {
+  route: PropTypes.shape({
+    props: PropTypes.shape({
+      targetPath: PropTypes.string,
+    }),
+  }),
+};
+
 // TODO: Include "routes" debug route if dev build
 const bakedInRoutes = [
   {
@@ -127,11 +150,22 @@ const createRoutes = ({
     props: { children: WorkList, servicesManager, extensionManager },
   };
 
+  const StartupRoute = {
+    path: '/',
+    children: StartupRedirect,
+    private: true,
+    props: {
+      targetPath: showStudyList === false ? '/viewer' : '/',
+    },
+  };
+
   const customRoutes = customizationService.getCustomization('routes.customRoutes');
+  const initialModeRoute = window.config.initialModeRoute || '/viewer';
+  StartupRoute.props.targetPath = showStudyList === false ? initialModeRoute : '/';
 
   const allRoutes = [
     ...routes,
-    ...(showStudyList ? [WorkListRoute] : []),
+    ...(showStudyList ? [WorkListRoute] : [StartupRoute]),
     ...(customRoutes?.routes || []),
     ...bakedInRoutes,
     customRoutes?.notFoundRoute || notFoundRoute,

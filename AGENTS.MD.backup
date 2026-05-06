@@ -20,6 +20,8 @@
   APP_CONFIG=xunying yarn run dev
   2. 访问 URL:
   http://localhost:3000/viewer?StudyInstanceUIDs=<study_uid>&token=<your_token>&hospital=<hospital_id>
+  http://localhost:3000/viewer?StudyInstanceUIDs=1.2.840.113619.2.417.3.2831214592.758.1776910662.585&token=eyJ0eXBlIjoiYmFzaWMgYXV0aCIsInN0dWR5dWlkIjpbIjEuMi44NDAuMTEzNjE5LjIuNDE3LjMuMjgzMTIxNDU5Mi43NTguMTc3NjkxMDY2Mi41ODUiXX0&hospital=shapyy
+  https://xunyingmed.cn/hpview/HPView.html?hospital=shapyy&studyuid=1.2.840.113619.2.417.3.2831214592.758.1776910662.585&token=eyJ0eXBlIjoiYmFzaWMgYXV0aCIsInN0dWR5dWlkIjpbIjEuMi44NDAuMTEzNjE5LjIuNDE3LjMuMjgzMTIxNDU5Mi43NTguMTc3NjkxMDY2Mi41ODUiXX0.HNyjwQ.HI20KEi8M76rYnG_gtm4S9YYpII
 
   技术特性
 
