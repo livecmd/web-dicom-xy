@@ -1,0 +1,32 @@
+
+  完成的工作
+
+  核心文件:
+  - XunYingDataSource/index.ts - DataSource 主实现
+  - XunYingDataSource/imageLoader.ts - 自定义图像加载器
+  - XunYingDataSource/utils/httpClient.ts - HTTP 请求处理
+  - XunYingDataSource/utils/mapFields.ts - 数据格式转换
+  - platform/app/public/config/xunying.js - 应用配置
+  - XunYingDataSource/README.md - 使用文档
+
+  集成点:
+  - 已在 getDataSourcesModule.js 中注册 xunying DataSource
+  - 图像加载器在 DataSource 初始化时自动注册到 Cornerstone
+  - 使用 xunying: scheme 处理图像请求
+
+  使用方法
+
+  1. 启动应用:
+  APP_CONFIG=xunying yarn run dev
+  2. 访问 URL:
+  http://localhost:3000/viewer?StudyInstanceUIDs=<study_uid>&token=<your_token>&hospital=<hospital_id>
+
+  技术特性
+
+  - 支持 8-bit、16-bit 和 RGB 图像
+  - 自动处理多帧图像
+  - Study 级别的元数据缓存
+  - 双重认证机制（JSON API 用 header，WADO API 用 query 参数）
+  - 完整的 DICOM 字段映射
+
+  适配器已就绪，可以连接到迅影后端进行测试。

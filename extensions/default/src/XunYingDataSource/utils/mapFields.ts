@@ -1,0 +1,130 @@
+const MODALITY_SOP_CLASS_MAP: Record<string, string> = {
+  CT: '1.2.840.10008.5.1.4.1.1.2',
+  MR: '1.2.840.10008.5.1.4.1.1.4',
+  CR: '1.2.840.10008.5.1.4.1.1.1',
+  DX: '1.2.840.10008.5.1.4.1.1.1.1',
+  MG: '1.2.840.10008.5.1.4.1.1.1.2',
+  XA: '1.2.840.10008.5.1.4.1.1.12.1',
+  US: '1.2.840.10008.5.1.4.1.1.6.1',
+  NM: '1.2.840.10008.5.1.4.1.1.20',
+  PT: '1.2.840.10008.5.1.4.1.1.128',
+  SC: '1.2.840.10008.5.1.4.1.1.7',
+};
+
+const DEFAULT_SOP_CLASS_UID = '1.2.840.10008.5.1.4.1.1.7';
+
+export function getSopClassUID(modality: string): string {
+  if (!modality) {
+    return DEFAULT_SOP_CLASS_UID;
+  }
+  return MODALITY_SOP_CLASS_MAP[modality.toUpperCase()] || DEFAULT_SOP_CLASS_UID;
+}
+
+function parseBackslashSeparated(value: string | undefined | null): number[] | undefined {
+  if (!value || value === '') {
+    return undefined;
+  }
+  return value.split('\\').map(Number);
+}
+
+function parseDateToDA(dateStr: string | undefined | null): string | undefined {
+  if (!dateStr) {
+    return undefined;
+  }
+  return dateStr.replace(/-/g, '').substring(0, 8);
+}
+
+function parseTimeToTM(dateStr: string | undefined | null): string | undefined {
+  if (!dateStr) {
+    return undefined;
+  }
+  const parts = dateStr.split(' ');
+  if (parts.length > 1) {
+    return parts[1].replace(/:/g, '');
+  }
+  return undefined;
+}
+
+export interface XunYingImageData {
+  imageuid: string;
+  rows: number;
+  columns: number;
+  numberofframes: number;
+  imageno: number;
+  seriesno: string;
+  pixelspacing: string;
+  sliceloction: string;
+  pat_name: string;
+  patid: string;
+  age: string;
+  sex: string;
+  model_name: string;
+  manufacturer: string;
+  institution_name: string;
+  series_date: string;
+  series_desc: string;
+  series_no: string;
+  slice_thick: string;
+  studyid: string;
+  study_desc: string;
+}
+
+export interface XunYingStudyData {
+  name: string;
+  studytime: string;
+  modalities: string;
+  sex: string;
+  series: string[];
+  airesults?: any;
+}
+
+export function mapInstanceToNaturalized(
+  imageData: XunYingImageData,
+  studyUID: string,
+  seriesUID: string,
+  modality: string,
+  studyData: XunYingStudyData,
+  imageIndex: number
+) {
+  const pixelSpacing = parseBackslashSeparated(imageData.pixelspacing);
+  const sopClassUID = getSopClassUID(modality);
+  const is16Bit = ['CT', 'MR', 'PT', 'NM'].includes(modality.toUpperCase());
+
+  return {
+    StudyInstanceUID: studyUID,
+    SeriesInstanceUID: seriesUID,
+    SOPInstanceUID: imageData.imageuid,
+    SOPClassUID: sopClassUID,
+    Modality: modality,
+    Rows: imageData.rows,
+    Columns: imageData.columns,
+    NumberOfFrames: imageData.numberofframes || 1,
+    InstanceNumber: imageData.imageno || imageIndex + 1,
+    SeriesNumber: parseInt(imageData.series_no || imageData.seriesno) || 1,
+    SeriesDescription: imageData.series_desc || '',
+    StudyDescription: imageData.study_desc || studyData?.name || '',
+    StudyDate: parseDateToDA(imageData.series_date || studyData?.studytime),
+    StudyTime: parseTimeToTM(studyData?.studytime),
+    SeriesDate: parseDateToDA(imageData.series_date),
+    PatientName: imageData.pat_name || studyData?.name || '',
+    PatientID: imageData.patid || '',
+    PatientSex: imageData.sex || studyData?.sex || '',
+    PatientAge: imageData.age || '',
+    Manufacturer: imageData.manufacturer || '',
+    ManufacturerModelName: imageData.model_name || '',
+    InstitutionName: imageData.institution_name || '',
+    StudyID: imageData.studyid || '',
+    SliceThickness: imageData.slice_thick ? parseFloat(imageData.slice_thick) : undefined,
+    SliceLocation: imageData.sliceloction ? parseFloat(imageData.sliceloction) : undefined,
+    PixelSpacing: pixelSpacing,
+    BitsAllocated: is16Bit ? 16 : 8,
+    BitsStored: is16Bit ? 16 : 8,
+    HighBit: is16Bit ? 15 : 7,
+    PixelRepresentation: is16Bit ? 1 : 0,
+    SamplesPerPixel: 1,
+    PhotometricInterpretation: 'MONOCHROME2',
+    RescaleSlope: 1,
+    RescaleIntercept: 0,
+    FrameOfReferenceUID: seriesUID + '.0',
+  };
+}
