@@ -26,7 +26,8 @@ function PanelStudyBrowser({
   onDoubleClickThumbnailHandlerCallBack,
 }) {
   const { servicesManager, commandsManager, extensionManager } = useSystem();
-  const { displaySetService, customizationService } = servicesManager.services;
+  const { displaySetService, customizationService, studyPrefetcherService } =
+    servicesManager.services;
   const navigate = useNavigate();
   const studyMode =
     (customizationService.getCustomization('studyBrowser.studyMode') as string) || 'all';
@@ -78,6 +79,8 @@ function PanelStudyBrowser({
 
   const onDoubleClickThumbnailHandler = useCallback(
     async displaySetInstanceUID => {
+      studyPrefetcherService?.prioritizeDisplaySet?.(displaySetInstanceUID);
+
       const customHandler = customizationService.getCustomization(
         'studyBrowser.thumbnailDoubleClickCallback'
       ) as CallbackCustomization;
@@ -103,8 +106,40 @@ function PanelStudyBrowser({
       servicesManager,
       isHangingProtocolLayout,
       customizationService,
+      studyPrefetcherService,
     ]
   );
+
+  useEffect(() => {
+    if (!studyPrefetcherService) {
+      return;
+    }
+
+    const progressSubscription = studyPrefetcherService.subscribe(
+      studyPrefetcherService.EVENTS.DISPLAYSET_LOAD_PROGRESS,
+      ({ displaySetInstanceUID, loadingProgress }) => {
+        setDisplaySetsLoadingState(prevState => ({
+          ...prevState,
+          [displaySetInstanceUID]: loadingProgress,
+        }));
+      }
+    );
+
+    const completeSubscription = studyPrefetcherService.subscribe(
+      studyPrefetcherService.EVENTS.DISPLAYSET_LOAD_COMPLETE,
+      ({ displaySetInstanceUID }) => {
+        setDisplaySetsLoadingState(prevState => ({
+          ...prevState,
+          [displaySetInstanceUID]: 1,
+        }));
+      }
+    );
+
+    return () => {
+      progressSubscription.unsubscribe();
+      completeSubscription.unsubscribe();
+    };
+  }, [studyPrefetcherService]);
 
   // ~~ studyDisplayList
   useEffect(() => {

@@ -52,6 +52,10 @@ type StudyPrefetcherConfig = {
   maxNumPrefetchRequests: number;
   /* Display sets prefetching order (closest, downward and upward) */
   order: StudyPrefetchOrder;
+  /* Include active viewport display sets in the prefetch queue */
+  includeActiveDisplaySets: boolean;
+  /* Wait for active viewport display sets to finish before background prefetching */
+  waitForActiveDisplaySetLoaded: boolean;
 };
 
 type DisplaySetLoadingState = {
@@ -67,6 +71,10 @@ type ImageRequest = {
   displaySetInstanceUID: string;
   imageId: string;
   aborted: boolean;
+};
+
+type EnqueueDisplaySetImagesRequestsOptions = {
+  unshift?: boolean;
 };
 
 type PubSubServiceSubscription = { unsubscribe: () => any };
@@ -128,6 +136,9 @@ class StudyPrefetcherService extends PubSubService {
     maxNumPrefetchRequests: 10,
     /* Display sets prefetching order (closest, downward and upward) */
     order: StudyPrefetchOrder.downward,
+    /* Keep the legacy behavior unless explicitly enabled by app config */
+    includeActiveDisplaySets: false,
+    waitForActiveDisplaySetLoaded: true,
   };
 
   // Properties set by Cornerstone extension (initStudyPrefetcherService)
@@ -398,12 +409,19 @@ class StudyPrefetcherService extends PubSubService {
     // Creates a `Set` to look for UIDs in O(1) instead of O(n)
     const uidsSet = new Set(activeDisplaySetsInstanceUIDs);
 
+    if (this.config.includeActiveDisplaySets) {
+      const activeDisplaySets = displaySets.filter(ds => uidsSet.has(ds.displaySetInstanceUID));
+      const inactiveDisplaySets = displaySets.filter(ds => !uidsSet.has(ds.displaySetInstanceUID));
+      return [...activeDisplaySets, ...inactiveDisplaySets].slice(0, displaySetsCount);
+    }
+
+    const sortedDisplaySets = fnGetDisplaySets
+      .call(this, displaySets, activeDisplaySetIndex)
+      .filter(ds => !uidsSet.has(ds.displaySetInstanceUID));
+
     // Remove any active displaySet that may still be in the activeDisplaySetsInstanceUIDs.
     // That may happen when activeDisplaySetsInstanceUIDs has more than one element.
-    return fnGetDisplaySets
-      .call(this, displaySets, activeDisplaySetIndex)
-      .filter(ds => !uidsSet.has(ds.displaySetInstanceUID))
-      .slice(0, displaySetsCount);
+    return sortedDisplaySets.slice(0, displaySetsCount);
   }
 
   private _getDisplaySets() {
@@ -586,8 +604,8 @@ class StudyPrefetcherService extends PubSubService {
       return;
     }
 
-    // Does not send any prefetch request until the active display sets are loaded
-    if (!this._areActiveDisplaySetsLoaded()) {
+    // By default, keep prefetch quiet until the viewport's interaction loading finishes.
+    if (this.config.waitForActiveDisplaySetLoaded && !this._areActiveDisplaySetsLoaded()) {
       return;
     }
 
@@ -598,11 +616,35 @@ class StudyPrefetcherService extends PubSubService {
       return;
     }
 
-    const numImageRequests = Math.min(
-      pendingRequests.length,
-      maxNumPrefetchRequests - inflightRequests.size
-    );
-    const imageRequests = this._pendingRequests.splice(0, numImageRequests);
+    const activePrefetchDisplaySetInstanceUID =
+      this._getInflightDisplaySetInstanceUID() || pendingRequests[0]?.displaySetInstanceUID;
+
+    if (!activePrefetchDisplaySetInstanceUID) {
+      return;
+    }
+
+    // Keep series downloads sequential: do not begin the next display set while
+    // the current display set still has prefetch requests in flight.
+    if (
+      inflightRequests.size &&
+      pendingRequests[0]?.displaySetInstanceUID !== activePrefetchDisplaySetInstanceUID
+    ) {
+      return;
+    }
+
+    const numImageRequests = maxNumPrefetchRequests - inflightRequests.size;
+    const imageRequests: ImageRequest[] = [];
+
+    while (
+      imageRequests.length < numImageRequests &&
+      this._pendingRequests[0]?.displaySetInstanceUID === activePrefetchDisplaySetInstanceUID
+    ) {
+      const imageRequest = this._pendingRequests.shift();
+
+      if (imageRequest) {
+        imageRequests.push(imageRequest);
+      }
+    }
 
     imageRequests.forEach(imageRequest => {
       const { imageId } = imageRequest;
@@ -629,9 +671,62 @@ class StudyPrefetcherService extends PubSubService {
     });
   }
 
-  private _enqueueDisplaySetImagesRequests(displaySet: DisplaySet) {
+  private _getInflightDisplaySetInstanceUID(): string | undefined {
+    return Array.from(this._inflightRequests.values())[0]?.displaySetInstanceUID;
+  }
+
+  private _prioritizePendingRequests(displaySetInstanceUID: string): void {
+    const prioritizedRequests: ImageRequest[] = [];
+    const otherRequests: ImageRequest[] = [];
+
+    this._pendingRequests.forEach(request => {
+      if (request.displaySetInstanceUID === displaySetInstanceUID) {
+        prioritizedRequests.push(request);
+      } else {
+        otherRequests.push(request);
+      }
+    });
+
+    this._pendingRequests = [...prioritizedRequests, ...otherRequests];
+  }
+
+  private _getAllDisplaySetsWithPriority(displaySetInstanceUID: string): DisplaySet[] {
+    const { displaySetService } = this._servicesManager.services;
+    const displaySets = displaySetService.getActiveDisplaySets();
+    const priorityDisplaySet = displaySets.find(
+      ds => ds.displaySetInstanceUID === displaySetInstanceUID
+    );
+
+    if (!priorityDisplaySet) {
+      return displaySets;
+    }
+
+    return [
+      priorityDisplaySet,
+      ...displaySets.filter(ds => ds.displaySetInstanceUID !== displaySetInstanceUID),
+    ];
+  }
+
+  private _enqueueAllDisplaySetImagesRequestsWithPriority(displaySetInstanceUID: string): void {
+    const displaySets = this._getAllDisplaySetsWithPriority(displaySetInstanceUID);
+
+    displaySets.forEach(displaySet => {
+      this._addDisplaySetLoadingState(displaySet);
+      this._enqueueDisplaySetImagesRequests(displaySet, {
+        unshift: displaySet.displaySetInstanceUID === displaySetInstanceUID,
+      });
+    });
+
+    this._prioritizePendingRequests(displaySetInstanceUID);
+  }
+
+  private _enqueueDisplaySetImagesRequests(
+    displaySet: DisplaySet,
+    options: EnqueueDisplaySetImagesRequestsOptions = {}
+  ) {
     const { displaySetInstanceUID } = displaySet;
     const imageIds = this._getImageIdsForDisplaySet(displaySet);
+    const imageRequests: ImageRequest[] = [];
 
     imageIds.forEach(imageId => {
       if (this.cache.isImageCached(imageId)) {
@@ -639,12 +734,46 @@ class StudyPrefetcherService extends PubSubService {
         return;
       }
 
-      this._pendingRequests.push({
+      const isAlreadyQueued = this._pendingRequests.some(request => request.imageId === imageId);
+      const isAlreadyInflight = this._inflightRequests.has(imageId);
+
+      if (isAlreadyQueued || isAlreadyInflight) {
+        return;
+      }
+
+      imageRequests.push({
         displaySetInstanceUID,
         imageId,
         aborted: false,
       });
     });
+
+    if (!imageRequests.length) {
+      return;
+    }
+
+    if (options.unshift) {
+      this._pendingRequests = [...imageRequests, ...this._pendingRequests];
+      return;
+    }
+
+    this._pendingRequests.push(...imageRequests);
+  }
+
+  public prioritizeDisplaySet(displaySetInstanceUID: string): void {
+    const { displaySetService } = this._servicesManager.services;
+    const displaySet =
+      displaySetService.getDisplaySetByUID?.(displaySetInstanceUID) ||
+      displaySetService
+        .getActiveDisplaySets()
+        .find(ds => ds.displaySetInstanceUID === displaySetInstanceUID);
+
+    if (!displaySet) {
+      return;
+    }
+
+    this._enqueueAllDisplaySetImagesRequestsWithPriority(displaySetInstanceUID);
+    this._sendNextRequests();
   }
 
   /**

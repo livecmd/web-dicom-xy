@@ -12,6 +12,14 @@ window.config = {
     thumbnail: 75,
     prefetch: 25,
   },
+  studyPrefetcher: {
+    enabled: true,
+    displaySetsCount: Number.MAX_SAFE_INTEGER,
+    maxNumPrefetchRequests: 10,
+    order: 'downward',
+    includeActiveDisplaySets: true,
+    waitForActiveDisplaySetLoaded: false,
+  },
   defaultDataSourceName: 'xunying',
   dataSources: [
     {
