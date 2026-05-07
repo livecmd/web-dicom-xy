@@ -26,6 +26,7 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
     cornerstoneViewportService,
     colorbarService,
     displaySetService,
+    hangingProtocolService,
     viewportGridService,
     segmentationService,
   } = servicesManager.services;
@@ -579,6 +580,52 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
         });
 
         if (!areReconstructable) {
+          return getDisabledState(disabledText);
+        }
+
+        return {
+          disabled: false,
+        };
+      },
+    },
+    {
+      name: 'evaluate.hangingProtocolPreset',
+      evaluate: ({ viewportId, button, disabledText = 'Selected viewport is not supported' }) => {
+        const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(viewportId);
+
+        if (!displaySetUIDs?.length) {
+          return getDisabledState(disabledText);
+        }
+
+        const protocolId =
+          button?.props?.commands?.commandOptions?.protocolId ||
+          button?.props?.commands?.[0]?.commandOptions?.protocolId;
+
+        const protocol = hangingProtocolService.protocols.get(protocolId);
+
+        if (!protocol) {
+          return getDisabledState(disabledText);
+        }
+
+        const displaySets = displaySetUIDs.map(uid => {
+          const displaySet = displaySetService.getDisplaySetByUID(uid);
+          const referencedDisplaySetUID = displaySet?.measurements?.[0]?.displaySetInstanceUID;
+
+          if (displaySet?.Modality === 'SR' && referencedDisplaySetUID) {
+            return displaySetService.getDisplaySetByUID(referencedDisplaySetUID);
+          }
+
+          return displaySet;
+        });
+
+        const selectors = Object.values(protocol.displaySetSelectors || {});
+        const isValid =
+          selectors.length === 0 ||
+          selectors.every(selector =>
+            hangingProtocolService.areRequiredSelectorsValid([selector], displaySets[0])
+          );
+
+        if (!isValid) {
           return getDisabledState(disabledText);
         }
 

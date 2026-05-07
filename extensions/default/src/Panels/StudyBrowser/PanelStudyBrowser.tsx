@@ -269,7 +269,7 @@ function PanelStudyBrowser({
       return;
     }
 
-    const mappedDisplaySets = mapDisplaySetsWithState(
+    let mappedDisplaySets = mapDisplaySetsWithState(
       currentDisplaySets,
       displaySetsLoadingState,
       thumbnailImageSrcMap,
@@ -279,6 +279,8 @@ function PanelStudyBrowser({
     if (!customMapDisplaySets) {
       sortStudyInstances(mappedDisplaySets);
     }
+
+    mappedDisplaySets = applyDisplaySetDownloadCounts(mappedDisplaySets, displaySetsLoadingState);
 
     setDisplaySets(mappedDisplaySets);
   }, [
@@ -347,7 +349,7 @@ function PanelStudyBrowser({
     const SubscriptionDisplaySetsChanged = displaySetService.subscribe(
       displaySetService.EVENTS.DISPLAY_SETS_CHANGED,
       changedDisplaySets => {
-        const mappedDisplaySets = mapDisplaySetsWithState(
+        let mappedDisplaySets = mapDisplaySetsWithState(
           changedDisplaySets,
           displaySetsLoadingState,
           thumbnailImageSrcMap,
@@ -358,6 +360,11 @@ function PanelStudyBrowser({
           sortStudyInstances(mappedDisplaySets);
         }
 
+        mappedDisplaySets = applyDisplaySetDownloadCounts(
+          mappedDisplaySets,
+          displaySetsLoadingState
+        );
+
         setDisplaySets(mappedDisplaySets);
       }
     );
@@ -365,7 +372,7 @@ function PanelStudyBrowser({
     const SubscriptionDisplaySetMetaDataInvalidated = displaySetService.subscribe(
       displaySetService.EVENTS.DISPLAY_SET_SERIES_METADATA_INVALIDATED,
       () => {
-        const mappedDisplaySets = mapDisplaySetsWithState(
+        let mappedDisplaySets = mapDisplaySetsWithState(
           displaySetService.getActiveDisplaySets(),
           displaySetsLoadingState,
           thumbnailImageSrcMap,
@@ -375,6 +382,11 @@ function PanelStudyBrowser({
         if (!customMapDisplaySets) {
           sortStudyInstances(mappedDisplaySets);
         }
+
+        mappedDisplaySets = applyDisplaySetDownloadCounts(
+          mappedDisplaySets,
+          displaySetsLoadingState
+        );
 
         setDisplaySets(mappedDisplaySets);
       }
@@ -533,10 +545,6 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
         componentType === 'thumbnail' ? thumbnailDisplaySets : thumbnailNoImageDisplaySets;
 
       const numInstances = ds.numImageFrames ?? ds.instances?.length;
-      const loadingState = getDisplaySetLoadingState(
-        displaySetLoadingState?.[displaySetInstanceUID],
-        numInstances
-      );
 
       array.push({
         displaySetInstanceUID,
@@ -545,8 +553,7 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
         modality: ds.Modality,
         seriesDate: formatDate(ds.SeriesDate),
         numInstances,
-        loadingProgress: loadingState.loadingProgress,
-        countLabel: `${loadingState.loadedInstances}/${numInstances}`,
+        loadingProgress: displaySetLoadingState?.[displaySetInstanceUID],
         countIcon: ds.countIcon,
         messages: ds.messages,
         StudyInstanceUID: ds.StudyInstanceUID,
@@ -562,6 +569,22 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
     });
 
   return [...thumbnailDisplaySets, ...thumbnailNoImageDisplaySets];
+}
+
+function applyDisplaySetDownloadCounts(displaySets, displaySetLoadingState) {
+  return displaySets.map(displaySet => {
+    const numInstances = displaySet.numInstances || 0;
+    const loadingState = getDisplaySetLoadingState(
+      displaySetLoadingState?.[displaySet.displaySetInstanceUID],
+      numInstances
+    );
+
+    return {
+      ...displaySet,
+      loadingProgress: loadingState.loadingProgress,
+      countLabel: `${loadingState.loadedInstances}/${numInstances}`,
+    };
+  });
 }
 
 function getDisplaySetLoadingState(loadingState, numInstances) {

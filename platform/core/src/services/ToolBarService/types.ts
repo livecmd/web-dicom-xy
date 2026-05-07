@@ -59,9 +59,12 @@ export type ButtonProps = {
   disabled?: boolean;
   className?: string;
   evaluate?: EvaluatePublic;
+  dropdownOnPrimary?: boolean;
+  hidePrimaryItemInDropdown?: boolean;
   listeners?: Record<string, RunCommand>;
   options?: ButtonOptions[];
   buttonSection?: string | boolean;
+  primaryItemId?: string;
   isActive?: boolean;
 };
 

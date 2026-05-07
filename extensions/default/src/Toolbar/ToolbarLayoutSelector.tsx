@@ -11,6 +11,7 @@ function ToolbarLayoutSelectorWithServices({
   servicesManager,
   rows = 3,
   columns = 4,
+  showAdvancedPresets = true,
   ...props
 }) {
   const { customizationService } = servicesManager.services;
@@ -54,59 +55,61 @@ function ToolbarLayoutSelectorWithServices({
   );
 
   // Generate the advanced presets
-  const advancedPresets = advancedPresetsGenerator
-    ? advancedPresetsGenerator({ servicesManager })
-    : [
-        {
-          title: 'MPR',
-          icon: 'layout-three-col',
-          commandOptions: {
-            protocolId: 'mpr',
+  const advancedPresets = showAdvancedPresets
+    ? advancedPresetsGenerator
+      ? advancedPresetsGenerator({ servicesManager })
+      : [
+          {
+            title: 'MPR',
+            icon: 'layout-three-col',
+            commandOptions: {
+              protocolId: 'mpr',
+            },
           },
-        },
-        {
-          title: '3D four up',
-          icon: 'layout-four-up',
-          commandOptions: {
-            protocolId: '3d-four-up',
+          {
+            title: '3D four up',
+            icon: 'layout-four-up',
+            commandOptions: {
+              protocolId: '3d-four-up',
+            },
           },
-        },
-        {
-          title: '3D main',
-          icon: 'layout-three-row',
-          commandOptions: {
-            protocolId: '3d-main',
+          {
+            title: '3D main',
+            icon: 'layout-three-row',
+            commandOptions: {
+              protocolId: '3d-main',
+            },
           },
-        },
-        {
-          title: 'Axial Primary',
-          icon: 'layout-side-by-side',
-          commandOptions: {
-            protocolId: 'axial-primary',
+          {
+            title: 'Axial Primary',
+            icon: 'layout-side-by-side',
+            commandOptions: {
+              protocolId: 'axial-primary',
+            },
           },
-        },
-        {
-          title: '3D only',
-          icon: 'layout-single',
-          commandOptions: {
-            protocolId: '3d-only',
+          {
+            title: '3D only',
+            icon: 'layout-single',
+            commandOptions: {
+              protocolId: '3d-only',
+            },
           },
-        },
-        {
-          title: '3D primary',
-          icon: 'layout-side-by-side',
-          commandOptions: {
-            protocolId: '3d-primary',
+          {
+            title: '3D primary',
+            icon: 'layout-side-by-side',
+            commandOptions: {
+              protocolId: '3d-primary',
+            },
           },
-        },
-        {
-          title: 'Frame View',
-          icon: 'icon-stack',
-          commandOptions: {
-            protocolId: 'frame-view',
+          {
+            title: 'Frame View',
+            icon: 'icon-stack',
+            commandOptions: {
+              protocolId: 'frame-view',
+            },
           },
-        },
-      ];
+        ]
+    : [];
 
   // Unified selection handler that dispatches to the appropriate command
   const handleSelectionChange = useCallback(
@@ -154,7 +157,7 @@ function ToolbarLayoutSelectorWithServices({
                       />
                     ))}
                   </LayoutSelector.PresetSection>
-                  <LayoutSelector.Divider />
+                  {advancedPresets.length > 0 && <LayoutSelector.Divider />}
                 </>
               )}
 
@@ -199,6 +202,7 @@ ToolbarLayoutSelectorWithServices.propTypes = {
   servicesManager: PropTypes.object,
   rows: PropTypes.number,
   columns: PropTypes.number,
+  showAdvancedPresets: PropTypes.bool,
 };
 
 export default ToolbarLayoutSelectorWithServices;

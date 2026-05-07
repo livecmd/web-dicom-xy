@@ -37,7 +37,46 @@ window.config = {
   httpErrorHandler: error => {
     console.warn(error);
   },
-  whiteLabeling: {},
+  whiteLabeling: {
+    createLogoComponentFn: function (React) {
+      const publicUrl = window.PUBLIC_URL || './';
+      const logoSrc = `${publicUrl}assets/xunying-logo-blue.png`;
+
+      return React.createElement(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            whiteSpace: 'nowrap',
+          },
+        },
+        React.createElement('img', {
+          src: logoSrc,
+          alt: '迅影医疗',
+          style: {
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            objectFit: 'cover',
+          },
+        }),
+        React.createElement(
+          'span',
+          {
+            style: {
+              color: '#fff',
+              fontSize: '18px',
+              fontWeight: 600,
+              lineHeight: '32px',
+            },
+          },
+          '迅影医疗'
+        )
+      );
+    },
+  },
   extensions: [],
   modes: [],
   customizationService: {},

@@ -20,6 +20,36 @@ export const setToolActiveToolbar = {
   },
 };
 
+const createHangingProtocolButton = ({
+  id,
+  icon,
+  label,
+  protocolId,
+}: {
+  id: string;
+  icon: string;
+  label: string;
+  protocolId: string;
+}): Button => ({
+  id,
+  uiType: 'ohif.toolButton',
+  props: {
+    icon,
+    label: i18n.t(`Buttons:${label}`),
+    tooltip: i18n.t(`Buttons:${label}`),
+    commands: {
+      commandName: 'setHangingProtocol',
+      commandOptions: {
+        protocolId,
+      },
+    },
+    evaluate: {
+      name: 'evaluate.hangingProtocolPreset',
+      disabledText: i18n.t('Buttons:Selected viewport is not supported'),
+    },
+  },
+});
+
 const toolbarButtons: Button[] = [
   // sections
   {
@@ -30,10 +60,35 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'AdvancedMeasurementTools',
+    uiType: 'ohif.toolButtonList',
+    props: {
+      buttonSection: true,
+    },
+  },
+  {
+    id: 'MPRTools',
+    uiType: 'ohif.toolButtonList',
+    props: {
+      buttonSection: true,
+      primaryItemId: 'MPRPrimaryAxial',
+    },
+  },
+  {
+    id: 'AngleTools',
+    uiType: 'ohif.toolButtonList',
+    props: {
+      buttonSection: true,
+    },
+  },
+  {
     id: 'MoreTools',
     uiType: 'ohif.toolButtonList',
     props: {
       buttonSection: true,
+      dropdownOnPrimary: true,
+      hidePrimaryItemInDropdown: true,
+      primaryItemId: 'MoreMenu',
     },
   },
   {
@@ -463,6 +518,48 @@ const toolbarButtons: Button[] = [
       ],
     },
   },
+  createHangingProtocolButton({
+    id: 'MPRLayout',
+    icon: 'layout-advanced-mpr',
+    label: 'MPR',
+    protocolId: 'mpr',
+  }),
+  createHangingProtocolButton({
+    id: 'MPRFourUp',
+    icon: 'layout-advanced-3d-four-up',
+    label: '3D four up',
+    protocolId: 'fourUp',
+  }),
+  createHangingProtocolButton({
+    id: 'MPRMain3D',
+    icon: 'layout-advanced-3d-main',
+    label: '3D main',
+    protocolId: 'main3D',
+  }),
+  createHangingProtocolButton({
+    id: 'MPRPrimaryAxial',
+    icon: 'icon-mpr',
+    label: 'Axial Primary',
+    protocolId: 'primaryAxial',
+  }),
+  createHangingProtocolButton({
+    id: 'MPROnly3D',
+    icon: 'layout-advanced-3d-only',
+    label: '3D only',
+    protocolId: 'only3D',
+  }),
+  createHangingProtocolButton({
+    id: 'MPRPrimary3D',
+    icon: 'layout-advanced-3d-primary',
+    label: '3D primary',
+    protocolId: 'primary3D',
+  }),
+  createHangingProtocolButton({
+    id: 'MPRFrameView',
+    icon: 'tool-stack-scroll',
+    label: 'Frame View',
+    protocolId: '@ohif/frameView',
+  }),
   {
     id: 'Length',
     uiType: 'ohif.toolButton',
@@ -638,6 +735,7 @@ const toolbarButtons: Button[] = [
       rows: 3,
       columns: 4,
       evaluate: 'evaluate.action',
+      showAdvancedPresets: false,
     },
   },
   {
@@ -680,32 +778,44 @@ const toolbarButtons: Button[] = [
       ],
     },
   },
-  // {
-  //   id: 'Undo',
-  //   uiType: 'ohif.toolButton',
-  //   props: {
-  //     type: 'tool',
-  //     icon: 'prev-arrow',
-  //     label: 'Undo',
-  //     commands: {
-  //       commandName: 'undo',
-  //     },
-  //     evaluate: 'evaluate.action',
-  //   },
-  // },
-  // {
-  //   id: 'Redo',
-  //   uiType: 'ohif.toolButton',
-  //   props: {
-  //     type: 'tool',
-  //     icon: 'next-arrow',
-  //     label: 'Redo',
-  //     commands: {
-  //       commandName: 'redo',
-  //     },
-  //     evaluate: 'evaluate.action',
-  //   },
-  // },
+  {
+    id: 'MoreMenu',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-more-menu',
+      label: i18n.t('Buttons:More'),
+      tooltip: i18n.t('Buttons:More'),
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'Undo',
+    uiType: 'ohif.toolButton',
+    props: {
+      type: 'tool',
+      icon: 'Undo',
+      label: i18n.t('Buttons:Undo'),
+      tooltip: i18n.t('Buttons:Undo'),
+      commands: {
+        commandName: 'undo',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'Redo',
+    uiType: 'ohif.toolButton',
+    props: {
+      type: 'tool',
+      icon: 'Redo',
+      label: i18n.t('Buttons:Redo'),
+      tooltip: i18n.t('Buttons:Redo'),
+      commands: {
+        commandName: 'redo',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
 ];
 
 export default toolbarButtons;
