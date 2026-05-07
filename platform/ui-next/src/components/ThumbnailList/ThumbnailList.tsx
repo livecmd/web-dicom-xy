@@ -99,6 +99,7 @@ ThumbnailList.propTypes = {
       seriesDate: PropTypes.string,
       seriesNumber: PropTypes.any,
       numInstances: PropTypes.number,
+      countLabel: PropTypes.string,
       description: PropTypes.string,
       componentType: PropTypes.any,
       isTracked: PropTypes.bool,

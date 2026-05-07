@@ -117,20 +117,36 @@ function PanelStudyBrowser({
 
     const progressSubscription = studyPrefetcherService.subscribe(
       studyPrefetcherService.EVENTS.DISPLAYSET_LOAD_PROGRESS,
-      ({ displaySetInstanceUID, loadingProgress }) => {
+      ({
+        displaySetInstanceUID,
+        loadingProgress,
+        loadedInstances,
+        failedInstances,
+        numInstances,
+      }) => {
         setDisplaySetsLoadingState(prevState => ({
           ...prevState,
-          [displaySetInstanceUID]: loadingProgress,
+          [displaySetInstanceUID]: {
+            loadingProgress,
+            loadedInstances,
+            failedInstances,
+            numInstances,
+          },
         }));
       }
     );
 
     const completeSubscription = studyPrefetcherService.subscribe(
       studyPrefetcherService.EVENTS.DISPLAYSET_LOAD_COMPLETE,
-      ({ displaySetInstanceUID }) => {
+      ({ displaySetInstanceUID, loadedInstances, failedInstances, numInstances }) => {
         setDisplaySetsLoadingState(prevState => ({
           ...prevState,
-          [displaySetInstanceUID]: 1,
+          [displaySetInstanceUID]: {
+            loadingProgress: 1,
+            loadedInstances,
+            failedInstances,
+            numInstances,
+          },
         }));
       }
     );
@@ -516,7 +532,11 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
       const array =
         componentType === 'thumbnail' ? thumbnailDisplaySets : thumbnailNoImageDisplaySets;
 
-      const loadingProgress = displaySetLoadingState?.[displaySetInstanceUID];
+      const numInstances = ds.numImageFrames ?? ds.instances?.length;
+      const loadingState = getDisplaySetLoadingState(
+        displaySetLoadingState?.[displaySetInstanceUID],
+        numInstances
+      );
 
       array.push({
         displaySetInstanceUID,
@@ -524,8 +544,9 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
         seriesNumber: ds.SeriesNumber,
         modality: ds.Modality,
         seriesDate: formatDate(ds.SeriesDate),
-        numInstances: ds.numImageFrames ?? ds.instances?.length,
-        loadingProgress,
+        numInstances,
+        loadingProgress: loadingState.loadingProgress,
+        countLabel: `${loadingState.loadedInstances}/${numInstances}`,
         countIcon: ds.countIcon,
         messages: ds.messages,
         StudyInstanceUID: ds.StudyInstanceUID,
@@ -541,6 +562,27 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
     });
 
   return [...thumbnailDisplaySets, ...thumbnailNoImageDisplaySets];
+}
+
+function getDisplaySetLoadingState(loadingState, numInstances) {
+  if (loadingState && typeof loadingState === 'object') {
+    return {
+      loadingProgress: loadingState.loadingProgress,
+      loadedInstances: loadingState.loadedInstances ?? 0,
+    };
+  }
+
+  if (typeof loadingState === 'number') {
+    return {
+      loadingProgress: loadingState,
+      loadedInstances: Math.round(loadingState * numInstances),
+    };
+  }
+
+  return {
+    loadingProgress: undefined,
+    loadedInstances: 0,
+  };
 }
 
 function _getComponentType(ds) {

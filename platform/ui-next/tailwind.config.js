@@ -110,9 +110,9 @@ module.exports = {
         secondary: '#7BB2CE',
       },
       actions: {
-        primary: '#348CFD',
-        highlight: '#5ACCE6',
-        hover: 'rgba(52, 140, 253, 0.2)',
+        primary: 'var(--ohif-theme-primary)',
+        highlight: 'var(--ohif-theme-primary)',
+        hover: 'rgb(var(--ohif-theme-primary-rgb) / 0.2)',
       },
     },
   },

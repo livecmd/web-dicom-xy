@@ -17,6 +17,7 @@ const Thumbnail = ({
   description,
   seriesNumber,
   numInstances,
+  countLabel,
   loadingProgress,
   countIcon,
   messages,
@@ -161,7 +162,7 @@ const Thumbnail = ({
                 ) : (
                   <Icons.InfoSeries className="w-3" />
                 )}
-                <div>{numInstances}</div>
+                <div>{countLabel || numInstances}</div>
               </div>
             </div>
           </div>
@@ -217,7 +218,7 @@ const Thumbnail = ({
                   ) : (
                     <Icons.InfoSeries className="w-3" />
                   )}
-                  <div>{numInstances}</div>
+                  <div>{countLabel || numInstances}</div>
                 </div>
               </div>
             </div>
@@ -315,6 +316,7 @@ Thumbnail.propTypes = {
   description: PropTypes.string.isRequired,
   seriesNumber: PropTypes.any,
   numInstances: PropTypes.number.isRequired,
+  countLabel: PropTypes.string,
   loadingProgress: PropTypes.number,
   messages: PropTypes.object,
   isActive: PropTypes.bool.isRequired,

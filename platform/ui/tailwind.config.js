@@ -29,15 +29,15 @@ module.exports = {
       },
 
       primary: {
-        light: '#5acce6',
-        main: '#0944b3',
+        light: 'var(--ohif-theme-primary)',
+        main: 'var(--ohif-theme-primary)',
         dark: '#090c29',
-        active: '#348cfd',
+        active: 'var(--ohif-theme-primary)',
       },
       inputfield: {
         main: '#3a3f99',
         disabled: '#2b166b',
-        focus: '#5acce6',
+        focus: 'var(--ohif-theme-primary)',
         placeholder: '#39383f',
       },
 
@@ -69,9 +69,9 @@ module.exports = {
         secondary: '#7BB2CE',
       },
       actions: {
-        primary: '#348CFD',
-        highlight: '#5ACCE6',
-        hover: 'rgba(52, 140, 253, 0.2)',
+        primary: 'var(--ohif-theme-primary)',
+        highlight: 'var(--ohif-theme-primary)',
+        hover: 'rgb(var(--ohif-theme-primary-rgb) / 0.2)',
       },
       customgreen: {
         100: '#05D97C',

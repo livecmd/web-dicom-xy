@@ -550,17 +550,23 @@ class StudyPrefetcherService extends PubSubService {
 
   private _triggerDisplaySetEvents(displaySetInstanceUID: string) {
     const displaySetLoadingState = this._displaySetLoadingStates.get(displaySetInstanceUID);
-    const { loadingProgress, numInstances } = displaySetLoadingState;
+    const { loadingProgress, numInstances, loadedImageIds, failedImageIds } =
+      displaySetLoadingState;
 
     this._broadcastEvent(this.EVENTS.DISPLAYSET_LOAD_PROGRESS, {
       displaySetInstanceUID,
       numInstances,
+      loadedInstances: loadedImageIds.size,
+      failedInstances: failedImageIds.size,
       loadingProgress,
     });
 
     if (loadingProgress >= 1) {
       this._broadcastEvent(this.EVENTS.DISPLAYSET_LOAD_COMPLETE, {
         displaySetInstanceUID,
+        numInstances,
+        loadedInstances: loadedImageIds.size,
+        failedInstances: failedImageIds.size,
       });
     }
   }
