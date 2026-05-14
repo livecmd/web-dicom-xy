@@ -16,7 +16,7 @@ import { retrieveStudyMetadata, deleteStudyMetadataPromise } from './retrieveStu
 import StaticWadoClient from './utils/StaticWadoClient';
 import getDirectURL from '../utils/getDirectURL';
 import { fixBulkDataURI } from './utils/fixBulkDataURI';
-import {HeadersInterface} from '@ohif/core/src/types/RequestHeaders';
+import { HeadersInterface } from '@ohif/core/src/types/RequestHeaders';
 
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 
@@ -112,6 +112,28 @@ export interface HeaderOptions {
  */
 export const excludeTransferSyntax: HeaderOptions = { includeTransferSyntax: false };
 
+const STUDY_INSTANCE_UID_PARAM_KEYS = [
+  'StudyInstanceUIDs',
+  'studyInstanceUIDs',
+  'StudyInstanceUID',
+  'studyInstanceUID',
+  'studyInstanceUid',
+  'studyuid',
+  'studyUID',
+] as const;
+
+function splitStudyInstanceUIDParams(value: string | string[] | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(item => utils.splitComma([item]));
+  }
+
+  return utils.splitComma([value]);
+}
+
 /**
  * Creates a DICOM Web API based on the provided configuration.
  *
@@ -158,7 +180,7 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
        */
       generateWadoHeader = (options: HeaderOptions): HeadersInterface => {
         const authorizationHeader = getAuthorizationHeader();
-        if (options?.includeTransferSyntax!==false) {
+        if (options?.includeTransferSyntax !== false) {
           //Generate accept header depending on config params
           const formattedAcceptHeader = utils.generateAcceptHeader(
             dicomWebConfig.acceptHeader,
@@ -175,7 +197,7 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
           // which the server expects Accept: application/dicom+json will still include that in the
           // header.
           return {
-            ...authorizationHeader
+            ...authorizationHeader,
           };
         }
       };
@@ -687,20 +709,20 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
       return dicomWebConfigCopy;
     },
     getStudyInstanceUIDs({ params, query }) {
-      const paramsStudyInstanceUIDs = params.StudyInstanceUIDs || params.studyInstanceUIDs;
+      const safeParams = params || {};
+      const safeQuery = query || new URLSearchParams();
+      const paramKey = STUDY_INSTANCE_UID_PARAM_KEYS.find(key => safeParams[key]);
+      const paramsStudyInstanceUIDs = paramKey ? safeParams[paramKey] : undefined;
 
       const queryStudyInstanceUIDs = utils.splitComma(
-        query.getAll('StudyInstanceUIDs').concat(query.getAll('studyInstanceUIDs'))
+        STUDY_INSTANCE_UID_PARAM_KEYS.flatMap(key => safeQuery.getAll(key))
       );
 
-      const StudyInstanceUIDs =
-        (queryStudyInstanceUIDs.length && queryStudyInstanceUIDs) || paramsStudyInstanceUIDs;
-      const StudyInstanceUIDsAsArray =
-        StudyInstanceUIDs && Array.isArray(StudyInstanceUIDs)
-          ? StudyInstanceUIDs
-          : [StudyInstanceUIDs];
+      const studyInstanceUIDs =
+        (queryStudyInstanceUIDs.length && queryStudyInstanceUIDs) ||
+        splitStudyInstanceUIDParams(paramsStudyInstanceUIDs);
 
-      return StudyInstanceUIDsAsArray;
+      return studyInstanceUIDs.filter(Boolean);
     },
   };
 

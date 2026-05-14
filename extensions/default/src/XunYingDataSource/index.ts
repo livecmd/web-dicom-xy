@@ -22,6 +22,16 @@ export interface XunYingDataSourceConfig {
   onConfiguration?: (config: XunYingDataSourceConfig, params: any) => XunYingDataSourceConfig;
 }
 
+const STUDY_INSTANCE_UID_PARAM_KEYS = [
+  'StudyInstanceUIDs',
+  'studyInstanceUIDs',
+  'StudyInstanceUID',
+  'studyInstanceUID',
+  'studyInstanceUid',
+  'studyuid',
+  'studyUID',
+] as const;
+
 function pickFirstDefined<T>(...values: T[]): T | undefined {
   return values.find(value => value !== undefined && value !== null && value !== '') as
     | T
@@ -137,6 +147,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
           const studyUID = pickFirstDefined(
             origParams?.studyInstanceUid,
             origParams?.StudyInstanceUID,
+            origParams?.studyInstanceUID,
             origParams?.studyuid,
             origParams?.studyUID,
             splitStudyInstanceUIDs(origParams?.StudyInstanceUIDs)?.[0],
@@ -272,23 +283,14 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     },
 
     getStudyInstanceUIDs({ params, query }) {
+      const safeParams = params || {};
+      const safeQuery = query || new URLSearchParams();
       const paramsStudyInstanceUIDs = pickFirstDefined(
-        params.StudyInstanceUIDs,
-        params.studyInstanceUIDs,
-        params.StudyInstanceUID,
-        params.studyInstanceUID,
-        params.studyuid,
-        params.studyUID
+        ...STUDY_INSTANCE_UID_PARAM_KEYS.map(key => safeParams[key])
       );
 
       const queryStudyInstanceUIDs = utils.splitComma(
-        query
-          .getAll('StudyInstanceUIDs')
-          .concat(query.getAll('studyInstanceUIDs'))
-          .concat(query.getAll('StudyInstanceUID'))
-          .concat(query.getAll('studyInstanceUID'))
-          .concat(query.getAll('studyuid'))
-          .concat(query.getAll('studyUID'))
+        STUDY_INSTANCE_UID_PARAM_KEYS.flatMap(key => safeQuery.getAll(key))
       );
 
       const StudyInstanceUIDs =

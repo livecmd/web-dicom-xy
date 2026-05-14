@@ -10,7 +10,7 @@ import ViewportGrid from '@components/ViewportGrid';
 import Compose from './Compose';
 import loadModules from '../../pluginImports';
 import { defaultRouteInit } from './defaultRouteInit';
-import { updateAuthServiceAndCleanUrl } from './updateAuthServiceAndCleanUrl';
+import { updateAuthServiceFromToken } from './updateAuthServiceAndCleanUrl';
 
 const { getSplitParam } = utils;
 
@@ -74,7 +74,7 @@ export default function ModeRoute({
   const token = lowerCaseSearchParams.get('token');
 
   if (token) {
-    updateAuthServiceAndCleanUrl(token, location, userAuthenticationService);
+    updateAuthServiceFromToken(token, userAuthenticationService);
   }
 
   // An undefined dataSourceName implies that the active data source that is already set in the ExtensionManager should be used.

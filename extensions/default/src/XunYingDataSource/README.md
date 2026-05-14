@@ -90,13 +90,17 @@ window.config = {
 访问 OHIF Viewer 时，需要在 URL 中提供以下参数：
 
 ```
-http://localhost:3000/viewer?StudyInstanceUIDs=1.2.3.4&token=your_token&hospital=your_hospital
+http://localhost:3000/viewer?hospital=your_hospital&studyuid=1.2.3.4&token=your_token
 ```
 
 参数说明：
-- `StudyInstanceUIDs`: Study 的唯一标识符（必需）
+- `studyuid`: 生产环境使用的 Study 唯一标识符（必需）
 - `token`: 迅影 API 认证令牌（必需）
 - `hospital`: 医院标识符（必需）
+
+兼容性说明：
+- DataSource 同时兼容 `studyuid`、`studyUID`、`StudyInstanceUID`、`studyInstanceUID`、`studyInstanceUid`、`StudyInstanceUIDs`、`studyInstanceUIDs`
+- 推荐生产环境统一使用 `hospital=...&studyuid=...&token=...`
 
 ## API 映射
 
@@ -149,7 +153,7 @@ for (let frame = 1; frame <= numberOfFrames; frame++) {
 
 2. **访问 Viewer**:
    ```
-   http://localhost:3000/viewer?StudyInstanceUIDs=1.2.3.4&token=your_token&hospital=your_hospital
+   http://localhost:3000/viewer?hospital=your_hospital&studyuid=1.2.3.4&token=your_token
    ```
 
 3. **DataSource 自动初始化**:

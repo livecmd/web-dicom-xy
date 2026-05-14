@@ -40,7 +40,7 @@ function HeaderPatientInfo({ servicesManager, appConfig }: withAppTypes) {
 
   return (
     <div
-      className="hover:bg-muted flex cursor-pointer items-center justify-center gap-1 rounded-lg"
+      className={`${isMixedPatients ? 'hidden' : 'flex'} hover:bg-muted cursor-pointer items-center justify-center gap-1 rounded-lg`}
       onClick={handleOnClick}
     >
       {isMixedPatients ? (
