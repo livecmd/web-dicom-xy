@@ -163,8 +163,18 @@ const createRoutes = ({
   const initialModeRoute = window.config.initialModeRoute || '/viewer';
   StartupRoute.props.targetPath = showStudyList === false ? initialModeRoute : '/';
 
+  const HPViewRoute = {
+    path: '/HPView.html',
+    children: StartupRedirect,
+    private: true,
+    props: {
+      targetPath: initialModeRoute,
+    },
+  };
+
   const allRoutes = [
     ...routes,
+    HPViewRoute,
     ...(showStudyList ? [WorkListRoute] : [StartupRoute]),
     ...(customRoutes?.routes || []),
     ...bakedInRoutes,

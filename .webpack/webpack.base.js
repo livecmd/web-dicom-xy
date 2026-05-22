@@ -27,6 +27,7 @@ const NODE_ENV = process.env.NODE_ENV;
 const QUICK_BUILD = process.env.QUICK_BUILD;
 const BUILD_NUM = process.env.CIRCLE_BUILD_NUM || '0';
 const IS_COVERAGE = process.env.COVERAGE === 'true';
+const GENERATE_SOURCEMAP = process.env.GENERATE_SOURCEMAP !== 'false';
 
 // read from ../version.txt
 const VERSION_NUMBER = fs.readFileSync(path.join(__dirname, '../version.txt'), 'utf8') || '';
@@ -65,7 +66,7 @@ module.exports = (env, argv, { SRC_DIR, ENTRY }) => {
 
   const config = {
     mode: isProdBuild ? 'production' : 'development',
-    devtool: isProdBuild ? 'source-map' : 'cheap-module-source-map',
+    devtool: isProdBuild ? (GENERATE_SOURCEMAP ? 'source-map' : false) : 'cheap-module-source-map',
     entry: ENTRY,
     optimization: {
       // splitChunks: {

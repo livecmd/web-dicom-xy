@@ -1,8 +1,12 @@
-navigator.serviceWorker.getRegistrations().then(function (registrations) {
-  for (let registration of registrations) {
-    registration.unregister();
-  }
-});
+const supportsServiceWorker = 'serviceWorker' in navigator;
+
+if (supportsServiceWorker) {
+  navigator.serviceWorker.getRegistrations().then(function (registrations) {
+    for (let registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
 
 // https://developers.google.com/web/tools/workbox/modules/workbox-window
 // All major browsers that support service worker also support native JavaScript
@@ -16,7 +20,6 @@ if ('function' === typeof importScripts) {
     'https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-window.prod.mjs'
   );
 
-  var supportsServiceWorker = 'serviceWorker' in navigator;
   var isNotLocalDevelopment = ['localhost', '127'].indexOf(location.hostname) === -1;
 
   if (supportsServiceWorker && isNotLocalDevelopment) {
