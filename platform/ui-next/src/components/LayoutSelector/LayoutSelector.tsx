@@ -19,6 +19,7 @@ type LayoutPresetType = {
   icon: string;
   commandOptions: LayoutCommandOptions;
   disabled?: boolean;
+  dataCy?: string;
 };
 
 // Context
@@ -238,6 +239,7 @@ const Preset = ({
   className,
   isPreset = false,
   iconSize, // New prop
+  dataCy,
 }: PresetProps) => {
   const { onSelection, onSelectionPreset } = useLayoutSelector();
 
@@ -262,7 +264,7 @@ const Preset = ({
         className
       )}
       onClick={handleClick}
-      data-cy={title}
+      data-cy={dataCy || title}
     >
       <div className="flex-shrink-0">
         <Icons.ByName
@@ -332,7 +334,7 @@ const GridSelector = ({ rows = 3, columns = 4, className }: GridSelectorProps) =
 };
 
 const Divider = ({ className }: { className?: string }) => (
-  <div className={cn('h-px bg-background', className)}></div>
+  <div className={cn('bg-background h-px', className)}></div>
 );
 
 const HelpText = ({ children, className }: { children: React.ReactNode; className?: string }) => (

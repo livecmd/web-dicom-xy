@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 //
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const webpack = require('webpack');
 
@@ -37,6 +38,52 @@ const COMMIT_HASH = fs.readFileSync(path.join(__dirname, '../commit.txt'), 'utf8
 //
 dotenv.config();
 
+const splitEnvList = value =>
+  (value || '')
+    .split(/[;,]/)
+    .map(item => item.trim())
+    .filter(Boolean);
+
+const normalizeLicenseValue = value => value.trim().toLowerCase();
+
+const hashLicenseValue = (kind, value, salt) =>
+  crypto
+    .createHash('sha256')
+    .update(`${salt}:${kind}:${normalizeLicenseValue(value)}`)
+    .digest('hex');
+
+const createDeploymentLicense = () => {
+  const salt = process.env.OHIF_LICENSE_SALT || '';
+  const rawHospitals = splitEnvList(process.env.OHIF_LICENSE_HOSPITALS);
+  const rawHosts = splitEnvList(process.env.OHIF_LICENSE_HOSTS);
+  const hospitalHashes = [
+    ...splitEnvList(process.env.OHIF_LICENSE_HOSPITAL_HASHES),
+    ...rawHospitals.map(value => hashLicenseValue('hospital', value, salt)),
+  ];
+  const hostHashes = [
+    ...splitEnvList(process.env.OHIF_LICENSE_HOST_HASHES),
+    ...rawHosts.map(value => hashLicenseValue('host', value, salt)),
+  ];
+  const explicitEnabled = process.env.OHIF_LICENSE_ENABLED;
+  const enabled =
+    explicitEnabled === 'true' ||
+    (explicitEnabled !== 'false' && (hospitalHashes.length > 0 || hostHashes.length > 0));
+
+  if (!enabled) {
+    return null;
+  }
+
+  return {
+    enabled: true,
+    salt,
+    hospitalParam: process.env.OHIF_LICENSE_HOSPITAL_PARAM || 'hospital',
+    allowedHospitalHashes: hospitalHashes,
+    allowedHostHashes: hostHashes,
+  };
+};
+
+const DEPLOYMENT_LICENSE = createDeploymentLicense();
+
 const defineValues = {
   /* Application */
   'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
@@ -52,6 +99,9 @@ const defineValues = {
   'process.env.LOCIZE_API_KEY': JSON.stringify(process.env.LOCIZE_API_KEY || ''),
   'process.env.REACT_APP_I18N_DEBUG': JSON.stringify(process.env.REACT_APP_I18N_DEBUG || ''),
   'process.env.TEST_ENV': JSON.stringify(process.env.TEST_ENV || ''),
+  'process.env.OHIF_DEPLOYMENT_LICENSE': JSON.stringify(
+    DEPLOYMENT_LICENSE ? JSON.stringify(DEPLOYMENT_LICENSE) : ''
+  ),
 };
 
 // Only redefine updated values.  This avoids warning messages in the logs
@@ -238,8 +288,15 @@ module.exports = (env, argv, { SRC_DIR, ENTRY }) => {
   if (isProdBuild) {
     config.optimization.minimizer = [
       new TerserJSPlugin({
-        parallel: true,
-        terserOptions: {},
+        parallel: false,
+        extractComments: false,
+        terserOptions: {
+          compress: true,
+          mangle: true,
+          format: {
+            comments: false,
+          },
+        },
       }),
     ];
   }

@@ -1,7 +1,7 @@
 {
-  "name": "OHIF Viewer",
-  "short_name": "Viewer",
-  "description": "OHIF Viewer",
+  "name": "xunyingDICOM",
+  "short_name": "xunyingDICOM",
+  "description": "xunyingDICOM",
   "dir": "auto",
   "lang": "en-US",
   "orientation": "any",

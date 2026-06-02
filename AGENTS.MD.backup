@@ -23,6 +23,7 @@
   http://localhost:3000/viewer?StudyInstanceUIDs=1.2.840.113619.2.417.3.2831214592.758.1776910662.585&token=eyJ0eXBlIjoiYmFzaWMgYXV0aCIsInN0dWR5dWlkIjpbIjEuMi44NDAuMTEzNjE5LjIuNDE3LjMuMjgzMTIxNDU5Mi43NTguMTc3NjkxMDY2Mi41ODUiXX0&hospital=shapyy
   https://xunyingmed.cn/hpview/HPView.html?hospital=shapyy&studyuid=1.2.840.113619.2.417.3.2831214592.758.1776910662.585&token=eyJ0eXBlIjoiYmFzaWMgYXV0aCIsInN0dWR5dWlkIjpbIjEuMi44NDAuMTEzNjE5LjIuNDE3LjMuMjgzMTIxNDU5Mi43NTguMTc3NjkxMDY2Mi41ODUiXX0.HNyjwQ.HI20KEi8M76rYnG_gtm4S9YYpII
   http://localhost:3000/viewer?studyuid=1.2.840.113619.2.417.3.2831214592.758.1776910662.585&token=eyJ0eXBlIjoiYmFzaWMgYXV0aCIsInN0dWR5dWlkIjpbIjEuMi44NDAuMTEzNjE5LjIuNDE3LjMuMjgzMTIxNDU5Mi43NTguMTc3NjkxMDY2Mi41ODUiXX0&hospital=shapyy
+  http://localhost:3000/viewer?studyuid=1.2.246.512.1000.2986777304.1164477804.10082478952687895693&token=.eJwVxjsKgDAMANCrSGYJSRqT1KuIgz_QTbAdRLy7OL33QLnPDXqYp-tYmqmWHVq4Sl3veqzQD8AoKGrYsSATEUoOc_dEisym6h5_iULUI3di8WM5wfh-FpoYVg.HP7Gqw.RGmOrNdhmZiZMPeGVb6_BLJAFLI&hospital=ccfcyy
 
   技术特性
 
@@ -33,3 +34,32 @@
   - 完整的 DICOM 字段映射
 
   适配器已就绪，可以连接到迅影后端进行测试。
+
+打包方式
+$env:OHIF_LICENSE_HOSPITALS="医院标识"
+$env:OHIF_LICENSE_HOSTS="授权域名"
+$env:OHIF_LICENSE_SALT="每个代理商一组随机盐"
+yarn build:hpview
+
+使用 $hpview-license-build 给 hospital=AAA、域名 BBB 打一个授权 hpview 包，salt 用 xxx
+.\.codex\skills\hpview-license-build\scripts\build-hpview-license.ps1 `
+  -Hospital "AAA" `
+  -HostName "BBB" `
+  -Salt "给每个代理商单独生成的随机盐"
+
+  使用 $hpview-license-build 给 hospital=nzqrmyy、域名 186.168.100.51 打一个授权 hpview 包，salt 用 yzyhyl
+.\.codex\skills\hpview-license-build\scripts\build-hpview-license.ps1 `
+  -Hospital "AAA" `
+  -HostName "BBB" `
+  -Salt "给每个代理商单独生成的随机盐"
+
+hospital=cskxzlyy001
+host=yizhigroup.cn
+salt=test
+Hospital hash: d0132924274b7d3e9dd5361f91d369b62489d18c4dd061d6d090beb09f3417d2
+Host hash: c4fb249594ac50ab5059b9269c3ed183767d2f478e110e8cea415bb829abc7f5
+
+
+验证结果：授权单测通过；QUICK_BUILD=true 的 hpview 构建通过；我用测试医院/测试域名打包后在 platform/app/dist 全局搜索，明文没有出现在产物里。完整压缩版构建在本机 Terser 阶段以 Windows 退出码 3221226505 退出，像是本机压缩进程/内存问题，不是这次代码的编译错误。全仓 tsc --noEmit 也会被大量既有类型问题拦住。
+
+提醒一句实话：纯前端门禁只能防“直接拷走、全局替换”的低成本绕过；真正防授权复制，最好让后端接口或 token 也绑定 hospital + host + studyuid，服务端不匹配就拒绝数据。

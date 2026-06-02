@@ -29,6 +29,7 @@ window.config = {
         friendlyName: '迅影 DICOM 服务器',
         name: 'xunying',
         baseUrl: '/webpacs/api',
+        // baseUrl: 'http://yizhigroup.cn/webpacs/api',
         // baseUrl: 'https://xunyingmed.cn/webpacs/api',
         hospital: '',
         token: '',

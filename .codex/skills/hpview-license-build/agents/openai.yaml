@@ -1,0 +1,4 @@
+interface:
+  display_name: "HPView License Build"
+  short_description: "Build hospital and host locked HPView packages"
+  default_prompt: "Use $hpview-license-build to create an authorized HPView package for a hospital and host."

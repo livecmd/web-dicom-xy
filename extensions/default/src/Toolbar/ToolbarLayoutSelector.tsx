@@ -15,7 +15,29 @@ function ToolbarLayoutSelectorWithServices({
   ...props
 }) {
   const { customizationService } = servicesManager.services;
-  const { t } = useTranslation('ToolbarLayoutSelector');
+  const { t } = useTranslation(['ToolbarLayoutSelector', 'Hps']);
+  const translatedHpTitle = title => t(`Hps:${title}`, { defaultValue: title });
+  const getPresetDataCy = preset => {
+    const protocolId = preset.commandOptions?.protocolId;
+
+    return (
+      {
+        mpr: 'MPR',
+        fourUp: '3D four up',
+        '3d-four-up': '3D four up',
+        main3D: '3D main',
+        '3d-main': '3D main',
+        primaryAxial: 'Axial Primary',
+        'axial-primary': 'Axial Primary',
+        only3D: '3D only',
+        '3d-only': '3D only',
+        primary3D: '3D primary',
+        '3d-primary': '3D primary',
+        '@ohif/frameView': 'Frame View',
+        'frame-view': 'Frame View',
+      }[protocolId] || preset.title
+    );
+  };
 
   // Get the presets from the customization service
   const commonPresets = customizationService?.getCustomization('layoutSelector.commonPresets') || [
@@ -60,49 +82,49 @@ function ToolbarLayoutSelectorWithServices({
       ? advancedPresetsGenerator({ servicesManager })
       : [
           {
-            title: 'MPR',
+            title: translatedHpTitle('MPR'),
             icon: 'layout-three-col',
             commandOptions: {
               protocolId: 'mpr',
             },
           },
           {
-            title: '3D four up',
+            title: translatedHpTitle('3D four up'),
             icon: 'layout-four-up',
             commandOptions: {
               protocolId: '3d-four-up',
             },
           },
           {
-            title: '3D main',
+            title: translatedHpTitle('3D main'),
             icon: 'layout-three-row',
             commandOptions: {
               protocolId: '3d-main',
             },
           },
           {
-            title: 'Axial Primary',
+            title: translatedHpTitle('Axial Primary'),
             icon: 'layout-side-by-side',
             commandOptions: {
               protocolId: 'axial-primary',
             },
           },
           {
-            title: '3D only',
+            title: translatedHpTitle('3D only'),
             icon: 'layout-single',
             commandOptions: {
               protocolId: '3d-only',
             },
           },
           {
-            title: '3D primary',
+            title: translatedHpTitle('3D primary'),
             icon: 'layout-side-by-side',
             commandOptions: {
               protocolId: '3d-primary',
             },
           },
           {
-            title: 'Frame View',
+            title: translatedHpTitle('Frame View'),
             icon: 'icon-stack',
             commandOptions: {
               protocolId: 'frame-view',
@@ -163,23 +185,28 @@ function ToolbarLayoutSelectorWithServices({
 
               {advancedPresets.length > 0 && (
                 <LayoutSelector.PresetSection title={t('Advanced')}>
-                  {advancedPresets.map((preset, index) => (
-                    <LayoutSelector.Preset
-                      key={`advanced-preset-${index}`}
-                      title={preset.title}
-                      icon={preset.icon}
-                      commandOptions={preset.commandOptions}
-                      disabled={preset.disabled}
-                      isPreset={true}
-                    />
-                  ))}
+                  {advancedPresets.map((preset, index) => {
+                    const title = preset.title ? translatedHpTitle(preset.title) : preset.title;
+
+                    return (
+                      <LayoutSelector.Preset
+                        key={`advanced-preset-${index}`}
+                        title={title}
+                        dataCy={preset.dataCy || getPresetDataCy(preset)}
+                        icon={preset.icon}
+                        commandOptions={preset.commandOptions}
+                        disabled={preset.disabled}
+                        isPreset={true}
+                      />
+                    );
+                  })}
                 </LayoutSelector.PresetSection>
               )}
             </div>
           )}
 
           {/* Right Side - Grid Layout */}
-          <div className="bg-muted flex flex-col gap-2.5 border-l-2 border-solid border-background p-2">
+          <div className="bg-muted border-background flex flex-col gap-2.5 border-l-2 border-solid p-2">
             <div className="text-muted-foreground text-xs">{t('Custom')}</div>
             <LayoutSelector.GridSelector
               rows={rows}

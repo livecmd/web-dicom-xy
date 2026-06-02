@@ -9,6 +9,7 @@ const autogenerationDisclaimer = `
 const extractName = val => (typeof val === 'string' ? val : val.packageName);
 
 const publicURL = process.env.PUBLIC_URL || '/';
+const productionCopyIgnore = ['**/*.map'];
 
 function isAbsolutePath(path) {
   return path.startsWith('http') || path.startsWith('/');
@@ -125,6 +126,9 @@ const createCopyPluginToDistForLink = (srcDir, distDir, plugins, folderName) => 
             from,
             to: `${distDir}${plugin.to || ''}`,
             toType: 'dir',
+            globOptions: {
+              ignore: productionCopyIgnore,
+            },
           }
         : undefined;
     })
@@ -141,6 +145,9 @@ const createCopyPluginToDistForBuild = (SRC_DIR, DIST_DIR, plugins, folderName) 
             from,
             to: DIST_DIR,
             toType: 'dir',
+            globOptions: {
+              ignore: productionCopyIgnore,
+            },
           }
         : undefined;
     })

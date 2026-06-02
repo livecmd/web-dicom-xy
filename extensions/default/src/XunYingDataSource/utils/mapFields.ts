@@ -38,7 +38,8 @@ function parseBackslashSeparated(value: string | undefined | null): number[] | u
   if (!value || value === '') {
     return undefined;
   }
-  return value.split('\\').map(Number);
+  const numbers = value.split('\\').map(Number);
+  return numbers.every(Number.isFinite) ? numbers : undefined;
 }
 
 function parseNumber(value: string | number | undefined | null): number | undefined {
@@ -65,6 +66,41 @@ function getImagePositionPatient(imageData: XunYingImageData): number[] | undefi
   }
 
   return undefined;
+}
+
+function getSliceSpacing(imageData: XunYingImageData, pixelSpacing?: number[]): number {
+  return (
+    parseNumber(imageData.slice_thick) ??
+    parseNumber(imageData.slicethick) ??
+    parseNumber(imageData.spacingbetweenslices) ??
+    parseNumber(imageData.spacingbetweenframes) ??
+    pixelSpacing?.[0] ??
+    1
+  );
+}
+
+function crossProduct(a: number[], b: number[]): number[] {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+
+function getSyntheticImagePositionPatient(
+  imageData: XunYingImageData,
+  imageOrientationPatient: number[] | undefined,
+  pixelSpacing: number[] | undefined,
+  imageIndex: number
+): number[] | undefined {
+  if (!imageOrientationPatient || imageOrientationPatient.length !== 6) {
+    return undefined;
+  }
+
+  const rowCosines = imageOrientationPatient.slice(0, 3);
+  const columnCosines = imageOrientationPatient.slice(3, 6);
+  const normal = crossProduct(rowCosines, columnCosines);
+  const spacing = getSliceSpacing(imageData, pixelSpacing);
+  const instanceNumber = parseNumber(imageData.imageno) ?? imageIndex + 1;
+  const offset = (instanceNumber - 1) * spacing;
+
+  return normal.map(component => component * offset);
 }
 
 function parseDateToDA(dateStr: string | undefined | null): string | undefined {
@@ -105,6 +141,9 @@ export interface XunYingImageData {
   series_desc: string;
   series_no: string;
   slice_thick: string;
+  slicethick?: string | number;
+  spacingbetweenslices?: string | number;
+  spacingbetweenframes?: string | number;
   studyid: string;
   study_desc: string;
   imgpos?: string;
@@ -135,10 +174,13 @@ export function mapInstanceToNaturalized(
 ) {
   const pixelSpacing = parseBackslashSeparated(imageData.pixelspacing);
   const imageOrientationPatient = getImageOrientationPatient(imageData);
-  const imagePositionPatient = getImagePositionPatient(imageData);
+  const imagePositionPatient =
+    getImagePositionPatient(imageData) ||
+    getSyntheticImagePositionPatient(imageData, imageOrientationPatient, pixelSpacing, imageIndex);
   const normalizedModality = normalizeModality(modality);
   const sopClassUID = getSopClassUID(normalizedModality);
   const is16Bit = ['CT', 'MR', 'PT', 'NM'].includes(normalizedModality);
+  const sliceSpacing = getSliceSpacing(imageData, pixelSpacing);
 
   return {
     StudyInstanceUID: studyUID,
@@ -165,7 +207,9 @@ export function mapInstanceToNaturalized(
     ManufacturerModelName: imageData.model_name || '',
     InstitutionName: imageData.institution_name || '',
     StudyID: imageData.studyid || '',
-    SliceThickness: imageData.slice_thick ? parseFloat(imageData.slice_thick) : undefined,
+    SliceThickness: sliceSpacing,
+    SpacingBetweenSlices: sliceSpacing,
+    SpacingBetweenFrames: sliceSpacing,
     SliceLocation: imageData.sliceloction ? parseFloat(imageData.sliceloction) : undefined,
     PixelSpacing: pixelSpacing,
     ImageOrientationPatient: imageOrientationPatient,

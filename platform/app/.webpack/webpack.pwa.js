@@ -1,6 +1,7 @@
 // https://developers.google.com/web/tools/workbox/guides/codelabs/webpack
 // ~~ WebPack
 const path = require('path');
+const fs = require('fs');
 const { merge } = require('webpack-merge');
 const webpack = require('webpack');
 const webpackBase = require('./../../../.webpack/webpack.base.js');
@@ -12,7 +13,8 @@ const { InjectManifest } = require('workbox-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 // ~~ Directories
 const SRC_DIR = path.join(__dirname, '../src');
-const DIST_DIR = path.join(__dirname, '../dist');
+const BUILD_OUTPUT_DIR = process.env.BUILD_OUTPUT_DIR || 'dist';
+const DIST_DIR = path.join(__dirname, '..', BUILD_OUTPUT_DIR);
 const PUBLIC_DIR = path.join(__dirname, '../public');
 // ~~ Env Vars
 const HTML_TEMPLATE = process.env.HTML_TEMPLATE || 'index.html';
@@ -37,6 +39,56 @@ const writePluginImportFile = require('./writePluginImportsFile.js');
 const open = process.env.OHIF_OPEN !== 'false';
 
 const copyPluginFromExtensions = writePluginImportFile(SRC_DIR, DIST_DIR);
+const productionCopyIgnore = ['**/*.map'];
+
+class RemoveProductionSourceMapsPlugin {
+  apply(compiler) {
+    compiler.hooks.afterEmit.tap('RemoveProductionSourceMapsPlugin', () => {
+      if (process.env.NODE_ENV !== 'production') {
+        return;
+      }
+
+      const stripSourceMapReference = filePath => {
+        if (!/\.(js|css)$/.test(filePath)) {
+          return;
+        }
+
+        const source = fs.readFileSync(filePath, 'utf8');
+        const stripped = source
+          .replace(/\/[#*]\s*sourceMappingURL=.*?(?:\*\/)?\s*$/gm, '')
+          .replace(/\n{3,}/g, '\n\n');
+
+        if (stripped !== source) {
+          fs.writeFileSync(filePath, stripped);
+        }
+      };
+
+      const walk = dir => {
+        if (!fs.existsSync(dir)) {
+          return;
+        }
+
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = path.join(dir, entry.name);
+
+          if (entry.isDirectory()) {
+            walk(fullPath);
+            continue;
+          }
+
+          if (entry.name.endsWith('.map')) {
+            fs.rmSync(fullPath, { force: true });
+            continue;
+          }
+
+          stripSourceMapReference(fullPath);
+        }
+      };
+
+      walk(DIST_DIR);
+    });
+  }
+}
 
 const setHeaders = (res, path) => {
   if (path.indexOf('.gz') !== -1) {
@@ -102,12 +154,15 @@ module.exports = (env, argv) => {
             globOptions: {
               // Ignore our HtmlWebpackPlugin template file
               // Ignore our configuration files
-              ignore: ['**/config/**', '**/html-templates/**', '.DS_Store'],
+              ignore: ['**/config/**', '**/html-templates/**', '.DS_Store', ...productionCopyIgnore],
             },
           },
           {
             from: '../../../node_modules/onnxruntime-web/dist',
             to: `${DIST_DIR}/ort`,
+            globOptions: {
+              ignore: productionCopyIgnore,
+            },
           },
           // Short term solution to make sure GCloud config is available in output
           // for our docker implementation
@@ -143,6 +198,7 @@ module.exports = (env, argv) => {
               maximumFileSizeToCacheInBytes: 1024 * 1024 * 50,
             }),
           ]),
+      new RemoveProductionSourceMapsPlugin(),
     ],
     // https://webpack.js.org/configuration/dev-server/
     devServer: {

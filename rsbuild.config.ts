@@ -4,6 +4,7 @@ import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 import path from 'path';
 import writePluginImportsFile from './platform/app/.webpack/writePluginImportsFile';
 import fs from 'fs';
+import crypto from 'crypto';
 
 const SRC_DIR = path.resolve(__dirname, './platform/app/src');
 const DIST_DIR = path.resolve(__dirname, './platform/app/dist');
@@ -27,6 +28,52 @@ const PROXY_DOMAIN = process.env.PROXY_DOMAIN;
 const PROXY_PATH_REWRITE_FROM = process.env.PROXY_PATH_REWRITE_FROM;
 const PROXY_PATH_REWRITE_TO = process.env.PROXY_PATH_REWRITE_TO;
 
+const splitEnvList = (value?: string) =>
+  (value || '')
+    .split(/[;,]/)
+    .map(item => item.trim())
+    .filter(Boolean);
+
+const normalizeLicenseValue = (value: string) => value.trim().toLowerCase();
+
+const hashLicenseValue = (kind: 'hospital' | 'host', value: string, salt: string) =>
+  crypto
+    .createHash('sha256')
+    .update(`${salt}:${kind}:${normalizeLicenseValue(value)}`)
+    .digest('hex');
+
+const createDeploymentLicense = () => {
+  const salt = process.env.OHIF_LICENSE_SALT || '';
+  const rawHospitals = splitEnvList(process.env.OHIF_LICENSE_HOSPITALS);
+  const rawHosts = splitEnvList(process.env.OHIF_LICENSE_HOSTS);
+  const hospitalHashes = [
+    ...splitEnvList(process.env.OHIF_LICENSE_HOSPITAL_HASHES),
+    ...rawHospitals.map(value => hashLicenseValue('hospital', value, salt)),
+  ];
+  const hostHashes = [
+    ...splitEnvList(process.env.OHIF_LICENSE_HOST_HASHES),
+    ...rawHosts.map(value => hashLicenseValue('host', value, salt)),
+  ];
+  const explicitEnabled = process.env.OHIF_LICENSE_ENABLED;
+  const enabled =
+    explicitEnabled === 'true' ||
+    (explicitEnabled !== 'false' && (hospitalHashes.length > 0 || hostHashes.length > 0));
+
+  if (!enabled) {
+    return null;
+  }
+
+  return {
+    enabled: true,
+    salt,
+    hospitalParam: process.env.OHIF_LICENSE_HOSPITAL_PARAM || 'hospital',
+    allowedHospitalHashes: hospitalHashes,
+    allowedHostHashes: hostHashes,
+  };
+};
+
+const DEPLOYMENT_LICENSE = createDeploymentLicense();
+
 // Add port constant
 const OHIF_PORT = Number(process.env.OHIF_PORT || 3000);
 const OHIF_OPEN = process.env.OHIF_OPEN !== 'false';
@@ -48,6 +95,9 @@ export default defineConfig({
       'process.env.LOCIZE_PROJECTID': JSON.stringify(process.env.LOCIZE_PROJECTID || ''),
       'process.env.LOCIZE_API_KEY': JSON.stringify(process.env.LOCIZE_API_KEY || ''),
       'process.env.REACT_APP_I18N_DEBUG': JSON.stringify(process.env.REACT_APP_I18N_DEBUG || ''),
+      'process.env.OHIF_DEPLOYMENT_LICENSE': JSON.stringify(
+        DEPLOYMENT_LICENSE ? JSON.stringify(DEPLOYMENT_LICENSE) : ''
+      ),
     },
   },
   plugins: [pluginReact(), pluginNodePolyfill()],
