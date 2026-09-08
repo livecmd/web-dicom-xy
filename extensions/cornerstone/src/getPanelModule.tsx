@@ -4,6 +4,7 @@ import { Toolbox } from '@ohif/extension-default';
 import PanelSegmentation from './panels/PanelSegmentation';
 import ActiveViewportWindowLevel from './components/ActiveViewportWindowLevel';
 import PanelMeasurement from './panels/PanelMeasurement';
+import PanelAINodule from './panels/PanelAINodule';
 import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 import i18n from '@ohif/i18n';
 
@@ -73,6 +74,13 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
       component: () => {
         return <ActiveViewportWindowLevel servicesManager={servicesManager} />;
       },
+    },
+    {
+      name: 'panelAINodule',
+      iconName: 'tab-linear',
+      iconLabel: 'AI Nodule',
+      label: 'AI \u7ed3\u8282',
+      component: PanelAINodule,
     },
     {
       name: 'panelMeasurement',

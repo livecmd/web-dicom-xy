@@ -22,6 +22,7 @@ import CornerstoneCacheService from './services/CornerstoneCacheService';
 import CornerstoneViewportService from './services/ViewportService/CornerstoneViewportService';
 import ColorbarService from './services/ColorbarService';
 import ViewedDataService from './services/ViewedDataService';
+import AINoduleService from './services/AINoduleService';
 import * as CornerstoneExtensionTypes from './types';
 
 import { toolNames } from './initCornerstoneTools';
@@ -161,7 +162,7 @@ const cornerstoneExtension: Types.Extensions.Extension = {
     // Clear the unsubscriptions
     unsubscriptions.length = 0;
 
-    const { cineService, segmentationService } = servicesManager.services;
+    const { aiNoduleService, cineService, segmentationService } = servicesManager.services;
     // Empty out the image load and retrieval pools to prevent memory leaks
     // on the mode exits
     Object.values(cs3DEnums.RequestType).forEach(type => {
@@ -182,6 +183,7 @@ const cornerstoneExtension: Types.Extensions.Extension = {
       .getState()
       .clearSelectedSegmentationsForViewportStore();
     servicesManager.services.viewedDataService?.clearViewedData();
+    aiNoduleService?.clear();
     segmentationService.removeAllSegmentations();
   },
 
@@ -199,6 +201,7 @@ const cornerstoneExtension: Types.Extensions.Extension = {
     servicesManager.registerService(CornerstoneCacheService.REGISTRATION);
     servicesManager.registerService(ColorbarService.REGISTRATION);
     servicesManager.registerService(ViewedDataService.REGISTRATION);
+    servicesManager.registerService(AINoduleService.REGISTRATION);
 
     const { syncGroupService } = servicesManager.services;
     syncGroupService.registerCustomSynchronizer('frameview', createFrameViewSynchronizer);

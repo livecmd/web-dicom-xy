@@ -73,6 +73,7 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
 
   const studyDataPromises = new Map<string, Promise<XunYingStudyData>>();
   const studyMetadataPromises = new Map<string, Promise<any>>();
+  const aiResultPromises = new Map<string, Promise<unknown>>();
 
   function getHttpConfig(): XunYingHttpConfig {
     return httpConfig;
@@ -93,7 +94,6 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     const url = buildJsonUrl(getHttpConfig(), '/study', {
       level: 'study',
       studyuid: studyUID,
-      ai: 1,
     });
     const promise = fetchJson<XunYingStudyData>(getHttpConfig(), url).catch(error => {
       studyDataPromises.delete(cacheKey);
@@ -426,7 +426,29 @@ function createXunYingApi(xunyingConfig: XunYingDataSourceConfig, servicesManage
     return seriesMeta;
   }
 
-  return IWebApiDataSource.create(implementation);
+  const dataSource = IWebApiDataSource.create(implementation);
+
+  // Keep the screening endpoint behind the data-source capability so the
+  // viewer route remains independent of XunYing API details.
+  (dataSource as any).getAIResults = async (studyUID: string) => {
+    const cacheKey = getStudyDataCacheKey(studyUID);
+    const existingPromise = aiResultPromises.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const url = buildJsonUrl(getHttpConfig(), '/aiscreening', {
+      studyuid: studyUID,
+    });
+    const promise = fetchJson<unknown>(getHttpConfig(), url).catch(error => {
+      aiResultPromises.delete(cacheKey);
+      throw error;
+    });
+    aiResultPromises.set(cacheKey, promise);
+    return promise;
+  };
+
+  return dataSource;
 }
 
 export { createXunYingApi };

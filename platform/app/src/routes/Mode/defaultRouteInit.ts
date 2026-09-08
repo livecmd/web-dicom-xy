@@ -16,6 +16,7 @@ const { getSplitParam } = utils;
 export async function defaultRouteInit(
   {
     servicesManager,
+    commandsManager,
     studyInstanceUIDs,
     dataSource,
     filters,
@@ -23,8 +24,13 @@ export async function defaultRouteInit(
   hangingProtocolId,
   stageIndex
 ) {
-  const { displaySetService, hangingProtocolService, uiNotificationService, customizationService } =
-    servicesManager.services;
+  const {
+    displaySetService,
+    hangingProtocolService,
+    uiNotificationService,
+    customizationService,
+    viewportGridService,
+  } = servicesManager.services;
   /**
    * Function to apply the hanging protocol when the minimum number of display sets were
    * received or all display sets retrieval were completed
@@ -52,12 +58,127 @@ export async function defaultRouteInit(
 
     // run the hanging protocol matching on the displaySets with the predefined
     // hanging protocol in the mode configuration
-    hangingProtocolService.run({ studies, activeStudy, displaySets: sortedDisplaySets }, hangingProtocolId, {
-      stageIndex,
-    });
+    hangingProtocolService.run(
+      { studies, activeStudy, displaySets: sortedDisplaySets },
+      hangingProtocolId,
+      {
+        stageIndex,
+      }
+    );
   }
 
   const unsubscriptions = [];
+
+  /** Keep AI screening optional so standard DICOMweb/local data sources remain unchanged. */
+  function setupAINoduleDetections() {
+    const aiDataSource = dataSource as any;
+    const aiCommandsManager = commandsManager as any;
+    const aiViewportGridService = viewportGridService as any;
+    const aiNoduleService = (servicesManager.services as any).aiNoduleService;
+    const aiCornerstoneViewportService = (servicesManager.services as any)
+      .cornerstoneViewportService;
+    if (
+      typeof aiDataSource?.getAIResults !== 'function' ||
+      !aiCommandsManager?.getCommand?.('displayAINoduleDetections')
+    ) {
+      return;
+    }
+
+    let disposed = false;
+    let readySubscription;
+    let displaySetSubscription;
+    let gridStateSubscription;
+    let viewportDataSubscription;
+
+    const dispose = () => {
+      disposed = true;
+      readySubscription?.unsubscribe?.();
+      displaySetSubscription?.unsubscribe?.();
+      gridStateSubscription?.unsubscribe?.();
+      viewportDataSubscription?.unsubscribe?.();
+      aiCommandsManager.run?.('clearAINoduleDetections');
+      aiNoduleService?.clear?.();
+    };
+    unsubscriptions.push(dispose);
+
+    studyInstanceUIDs.forEach(studyInstanceUID =>
+      aiNoduleService?.setStudyLoading?.(studyInstanceUID, true)
+    );
+
+    Promise.all(
+      studyInstanceUIDs.map(async studyInstanceUID => {
+        try {
+          const detections = await aiDataSource.getAIResults(studyInstanceUID);
+          if (!disposed) {
+            aiNoduleService?.setStudyResults?.(studyInstanceUID, detections);
+          }
+          return { studyInstanceUID, detections };
+        } catch (error) {
+          if (!disposed) {
+            aiNoduleService?.setStudyError?.(studyInstanceUID, error);
+          }
+          console.warn(`Failed to load AI nodule detections for ${studyInstanceUID}:`, error);
+          return null;
+        }
+      })
+    ).then(results => {
+      if (disposed) {
+        return;
+      }
+
+      const successfulResults = results.filter(Boolean) as Array<{
+        studyInstanceUID: string;
+        detections: unknown;
+      }>;
+      if (!successfulResults.length) {
+        return;
+      }
+
+      const apply = () => {
+        if (disposed) {
+          return;
+        }
+
+        const outcomes = successfulResults.map(({ studyInstanceUID, detections }) =>
+          aiCommandsManager.run('displayAINoduleDetections', {
+            detections,
+            studyInstanceUID,
+          })
+        );
+
+        const complete = outcomes.every(
+          (outcome: any) => !outcome || outcome.total === 0 || outcome.applied === outcome.total
+        );
+        if (complete) {
+          readySubscription?.unsubscribe?.();
+          displaySetSubscription?.unsubscribe?.();
+          gridStateSubscription?.unsubscribe?.();
+          viewportDataSubscription?.unsubscribe?.();
+        }
+      };
+
+      readySubscription = aiViewportGridService?.subscribe?.(
+        aiViewportGridService.EVENTS.VIEWPORTS_READY,
+        apply
+      );
+      displaySetSubscription = displaySetService?.subscribe?.(
+        displaySetService.EVENTS.DISPLAY_SETS_ADDED,
+        apply
+      );
+      gridStateSubscription = aiViewportGridService?.subscribe?.(
+        aiViewportGridService.EVENTS.GRID_STATE_CHANGED,
+        apply
+      );
+      viewportDataSubscription = aiCornerstoneViewportService?.subscribe?.(
+        aiCornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
+        apply
+      );
+      // The ready event may already have fired before the async AI request
+      // completed, so always attempt once immediately as well.
+      apply();
+    });
+  }
+
   const issuedWarningSeries = [];
   const { unsubscribe: instanceAddedUnsubscribe } = DicomMetadataStore.subscribe(
     DicomMetadataStore.EVENTS.INSTANCES_ADDED,
@@ -155,6 +276,7 @@ export async function defaultRouteInit(
     await Promise.allSettled(allPromises).then(applyHangingProtocol);
     startRemainingPromises(remainingPromises);
     applyHangingProtocol();
+    setupAINoduleDetections();
   });
 
   return unsubscriptions;

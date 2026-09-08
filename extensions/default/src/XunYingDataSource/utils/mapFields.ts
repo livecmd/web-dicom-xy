@@ -122,7 +122,6 @@ export interface XunYingStudyData {
   modalities: string;
   sex: string;
   series: string[];
-  airesults?: any;
 }
 
 export function mapInstanceToNaturalized(

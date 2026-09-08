@@ -300,6 +300,7 @@ export default function ModeRoute({
       return defaultRouteInit(
         {
           servicesManager,
+          commandsManager,
           studyInstanceUIDs,
           dataSource,
           filters,

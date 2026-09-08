@@ -39,6 +39,8 @@
     "dev:fast": "cd platform/app && yarn run dev:fast",
     "show:config": "echo Config is $APP_CONFIG on $PUBLIC_URL",
     "dev": "lerna run dev:viewer --stream",
+    "dev:xunying": "yarn run dev:yizhi",
+    "dev:yizhi": "cross-env APP_CONFIG=config/xunying.js PROXY_TARGET=/webpacs/api PROXY_DOMAIN=http://yizhigroup.cn PROXY_PATH_REWRITE_FROM=/webpacs/api PROXY_PATH_REWRITE_TO=/webpacs/api yarn --cwd platform/app run dev",
     "dev:no:cache": "lerna run dev:no:cache --stream",
     "dev:project": ".scripts/dev.sh",
     "dev:orthanc": "lerna run dev:orthanc --stream",

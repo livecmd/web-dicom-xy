@@ -27,6 +27,7 @@ export const ohif = {
 };
 
 export const cornerstone = {
+  aiNodules: '@ohif/extension-cornerstone.panelModule.panelAINodule',
   measurements: '@ohif/extension-cornerstone.panelModule.panelMeasurement',
   labelMapSegmentationPanel:
     '@ohif/extension-cornerstone.panelModule.panelSegmentationWithToolsLabelMap',
@@ -305,8 +306,10 @@ export const basicLayout = {
   props: {
     leftPanels: [ohif.thumbnailList],
     leftPanelResizable: true,
-    rightPanels: [cornerstone.segmentation, cornerstone.measurements],
-    rightPanelClosed: true,
+    rightPanels: [cornerstone.aiNodules, cornerstone.segmentation, cornerstone.measurements],
+    rightPanelClosed: false,
+    rightPanelInitialExpandedWidth: 380,
+    rightPanelMinimumExpandedWidth: 320,
     rightPanelResizable: true,
     viewports: [
       {
